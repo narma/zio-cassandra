@@ -54,7 +54,7 @@ abstract class CassandraSessionSpec extends DefaultRunnableSpec with LogSupport 
           selectAll <- withSession(s => s.bind(select, Seq("user1")).flatMap(s.selectAll))
         } yield {
           assert(emptyResult)(isNone) &&
-          assert(selectAll.size)(equalTo(9))
+          assert(selectAll.size)(equalTo(9)) &&
           assert(
             selectAll
               .find(r => r.getInt("seq_nr") == 2)
