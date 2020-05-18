@@ -7,7 +7,7 @@ import cassandra.embedded.EmbeddedCassandra
 import cassandra.embedded.EmbeddedCassandra.Embedded
 import com.datastax.oss.driver.api.core.cql.{BatchStatement, BoundStatement, DefaultBatchType, PreparedStatement}
 import com.typesafe.config.ConfigFactory
-import wvlet.log.LogSupport
+import wvlet.log.{Logger, LogLevel, LogSupport}
 import zio.blocking._
 import zio.cassandra.config.CassandraConnectionConfig
 import zio.cassandra.session.Session
@@ -17,6 +17,7 @@ import zio.test.{DefaultRunnableSpec, ZSpec, _}
 import zio.{Task, ZIO, ZLayer}
 
 abstract class CassandraSessionSpec extends DefaultRunnableSpec with LogSupport {
+  Logger.setDefaultLogLevel(LogLevel.ERROR)
 
   import CassandraSessionSpec._
 
@@ -61,21 +62,19 @@ abstract class CassandraSessionSpec extends DefaultRunnableSpec with LogSupport 
           )(isSome(equalTo("nope")))
         }).provideCustomLayer(layers ++ goodSession)
       ),
-      testM("Invalid contact-points") {
-        assertM(
-          ZIO
-            .fromEither(CassandraConnectionConfig(badConfig))
-            .isFailure
-        )(equalTo(true))
+      test("Invalid contact-points") {
+        assert(
+          CassandraConnectionConfig(badConfig)
+        )(isLeft)
       },
-      testM("Valid contact-points") {
-        assertM(ZIO.fromEither(CassandraConnectionConfig(goodConfig)))(
-          equalTo(
+      test("Valid contact-points") {
+        assert(CassandraConnectionConfig(goodConfig))(
+          isRight(equalTo(
             CassandraConnectionConfig(List(new InetSocketAddress("1.2.3.4", 9042), new InetSocketAddress("5.6.7.8", 9)),
                                       Some("good_user"),
                                       Some("cassandra"),
                                       Some("fast"))
-          )
+          ))
         )
       }
     )
