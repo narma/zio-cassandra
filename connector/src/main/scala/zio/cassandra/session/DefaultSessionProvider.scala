@@ -3,12 +3,12 @@ package zio.cassandra.session
 import com.datastax.dse.driver.api.core.cql.reactive.ReactiveRow
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader
 import com.datastax.oss.driver.api.core.cql._
-import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
+import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
 import com.typesafe.config.Config
-import zio.cassandra.config.{CassandraConnectionConfig, DriverConfigLoaderFromConfig}
+import zio.cassandra.config.{ CassandraConnectionConfig, DriverConfigLoaderFromConfig }
 import zio.interop.reactivestreams._
 import zio.stream.ZStream
-import zio.{Task, ZIO}
+import zio.{ Task, ZIO }
 
 import scala.jdk.CollectionConverters._
 
@@ -28,6 +28,9 @@ object DefaultSessionProvider {
       new Session.CassandraSession {
 
         val underlying: CqlSession = session
+
+        override def close(): Task[Done] =
+          ZIO.fromCompletionStage(underlying.closeAsync()).map(_ => ())
 
         private def executeAsync(stmt: Statement[_]): Task[AsyncResultSet] =
           ZIO.fromCompletionStage(underlying.executeAsync(stmt))

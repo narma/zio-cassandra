@@ -1,7 +1,6 @@
 package zio.cassandra.config
 
 import java.net.InetSocketAddress
-
 import zio.config._
 import ConfigDescriptor._
 import zio.config.ConfigDocs.{Leaf => _}

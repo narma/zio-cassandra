@@ -4,6 +4,7 @@
 ```text
 scala = 2.13.2
 cassandra-driver = 4.6.1
+zio = 1.0.0-RC19
 ```
 
 Inspired by [akka/alpakka-cassandra](https://doc.akka.io/docs/alpakka/current/cassandra.html)
