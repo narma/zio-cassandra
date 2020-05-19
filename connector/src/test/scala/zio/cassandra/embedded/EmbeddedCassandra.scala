@@ -1,4 +1,4 @@
-package cassandra.embedded
+package zio.cassandra.embedded
 
 import java.net.InetAddress
 
