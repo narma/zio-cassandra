@@ -1,5 +1,0 @@
-package cassandra.impl
-
-import cassandra.CassandraSessionSpec
-
-object SessionSpec extends CassandraSessionSpec
