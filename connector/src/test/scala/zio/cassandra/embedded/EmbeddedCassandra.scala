@@ -5,7 +5,7 @@ import java.net.InetAddress
 import com.github.nosan.embedded.cassandra.EmbeddedCassandraFactory
 import com.github.nosan.embedded.cassandra.api.Cassandra
 import com.github.nosan.embedded.cassandra.artifact.Artifact
-import zio.{Has, Task, ZLayer}
+import zio.{ Has, Task, ZLayer }
 
 object EmbeddedCassandra {
 

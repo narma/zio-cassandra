@@ -17,6 +17,9 @@ trait Session {
   def select(stmt: Statement[_]): Stream[Throwable, ReactiveRow]
 
   // short-cuts
+  def bind(stmt: PreparedStatement, bindValues: Seq[AnyRef], profileName: String): Task[BoundStatement] =
+    bind(stmt, bindValues).map(_.setExecutionProfileName(profileName))
+
   def selectOne(stmt: Statement[_]): Task[Option[Row]] =
     execute(stmt).map(rs => Option(rs.one()))
 

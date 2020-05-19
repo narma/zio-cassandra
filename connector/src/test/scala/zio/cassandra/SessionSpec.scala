@@ -2,26 +2,26 @@ package zio.cassandra
 
 import java.time.Instant
 
-import com.datastax.oss.driver.api.core.cql.{BatchStatement, BoundStatement, DefaultBatchType}
+import com.datastax.oss.driver.api.core.cql.{ BatchStatement, BoundStatement, DefaultBatchType }
 import com.typesafe.config.ConfigFactory
-import wvlet.log.{Logger, LogLevel, LogSupport}
-import zio.{blocking => _, test => _, _}
+import wvlet.log.{ LogLevel, LogSupport, Logger }
+import zio.{ blocking => _, test => _, _ }
 import zio.cassandra.embedded.EmbeddedCassandra
-import zio.test.{DefaultRunnableSpec, _}
+import zio.test.{ DefaultRunnableSpec, _ }
 import zio.test.Assertion._
 
-object SessionSpec extends DefaultRunnableSpec with LogSupport  with Fixtures {
+object SessionSpec extends DefaultRunnableSpec with LogSupport with Fixtures {
   Logger.setDefaultLogLevel(LogLevel.ERROR)
 
   implicit class toJavaInt(val i: Int) extends AnyVal {
     def asJava: Integer = i.asInstanceOf[java.lang.Integer]
   }
 
-  override def spec = {
+  override def spec =
     suite("Work with cassandra session - complete scenario")(
       testM("Just create correct service and run queries")(
         for {
-        session <- getSession
+          session     <- getSession
           _           <- session.execute(keyspaceQuery)
           _           <- session.execute(tableQuery)
           insert      <- session.prepare(insertQuery)
@@ -30,8 +30,8 @@ object SessionSpec extends DefaultRunnableSpec with LogSupport  with Fixtures {
           select      <- session.prepare(selectQuery)
           emptyResult <- session.bind(select, Seq("user1")) >>= session.selectOne
           preparedBatchSeq <- ZIO.collectAll(0.until(10).map { i =>
-                                 session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now()))
-                           })
+                               session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now()))
+                             })
 
           _         <- executeBatch(preparedBatchSeq)
           _         <- session.bind(update, Seq("nope", "user1", 2.asJava)) >>= session.execute
@@ -46,9 +46,8 @@ object SessionSpec extends DefaultRunnableSpec with LogSupport  with Fixtures {
               .map(_.getString("data"))
           )(isSome(equalTo("nope")))
         }
-      ),
+      )
     ).provideCustomLayerShared(embeddedCassandra ++ goodSession)
-  }
 }
 
 trait Fixtures {
@@ -91,7 +90,7 @@ trait Fixtures {
 
   val embeddedCassandra = EmbeddedCassandra.createInstance(9042).mapError(TestFailure.die)
 
-  val goodSession= Session.live(ConfigFactory.load().getConfig("test-driver")).mapError(TestFailure.die)
+  val goodSession = Session.live(ConfigFactory.load().getConfig("test-driver")).mapError(TestFailure.die)
 
   def withSession[R](f: service.Session => Task[R]): ZIO[Session, Throwable, R] = ZIO.accessM[Session] { session =>
     f(session.get)
@@ -100,11 +99,11 @@ trait Fixtures {
   def getSession: URIO[Session, service.Session] = RIO.access[Session](_.get)
 
   def executeBatch(seq: Seq[BoundStatement]): RIO[Session, Unit] = withSession { s =>
-    val batch = BatchStatement.builder(DefaultBatchType.LOGGED)
-        .addStatements(seq: _*)
-        .build()
+    val batch = BatchStatement
+      .builder(DefaultBatchType.LOGGED)
+      .addStatements(seq: _*)
+      .build()
     s.execute(batch).unit
   }
-
 
 }

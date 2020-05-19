@@ -2,7 +2,6 @@
 test-output/
 .sbtopts
 project/.sbt
-project/*.sbt
 test-output/
 .bloop
 .metals

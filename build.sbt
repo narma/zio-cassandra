@@ -4,7 +4,6 @@ lazy val connector =
       testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
       scalaVersion := "2.13.2",
       name := "zio-cassandra",
-      organization := "com.quadcode",
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
           Dependencies.zioDependencies ++
@@ -14,6 +13,8 @@ lazy val connector =
         "utf-8",
         "-unchecked",
         "-explaintypes",
+        "-Yrangepos",
+        "-Ywarn-unused",
         "-Ymacro-annotations",
         "-deprecation",
         "-language:higherKinds",
