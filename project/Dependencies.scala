@@ -4,7 +4,7 @@ object Dependencies {
 
   val cassandraDriverVersion = "4.6.1"
 
-  val zioVersion = "1.0.0-RC19"
+  val zioVersion = "1.0.0-RC19-1"
 
   val javaStreamsInterop = "1.0.3.5-RC8"
 
