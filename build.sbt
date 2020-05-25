@@ -3,6 +3,7 @@ lazy val connector =
     .settings(
       testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
       scalaVersion := "2.13.2",
+      organization := "dev.zio.local",
       name := "zio-cassandra",
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
