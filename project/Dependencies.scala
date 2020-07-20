@@ -2,11 +2,11 @@ import sbt._
 
 object Dependencies {
 
-  val cassandraDriverVersion = "4.6.1"
+  val cassandraDriverVersion = "4.7.2"
 
-  val zioVersion = "1.0.0-RC19-2"
+  val zioVersion = "1.0.0-RC21-2"
 
-  val javaStreamsInterop = "1.0.3.5-RC8"
+  val javaStreamsInterop = "1.0.3.5-RC12"
 
   val cassandraDependencies = Seq(
     "com.datastax.oss" % "java-driver-core" % cassandraDriverVersion

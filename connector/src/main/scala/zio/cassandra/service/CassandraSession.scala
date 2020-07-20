@@ -5,7 +5,7 @@ import com.datastax.oss.driver.api.core.cql._
 import zio._
 import zio.stream.Stream
 
-trait Session {
+trait CassandraSession {
   def prepare(stmt: String): Task[PreparedStatement]
 
   def bind(stmt: PreparedStatement, bindValues: Seq[AnyRef]): Task[BoundStatement]

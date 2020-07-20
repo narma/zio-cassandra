@@ -23,7 +23,7 @@ object SessionSpec extends DefaultRunnableSpec with LogSupport with Fixtures {
     suite("Work with cassandra session - complete scenario")(
       testM("Just create correct service and run queries")(
         for {
-          session     <- ZIO.service[service.Session]
+          session     <- ZIO.service[service.CassandraSession]
           _           <- session.execute(keyspaceQuery)
           _           <- session.execute(tableQuery)
           insert      <- session.prepare(insertQuery)
@@ -100,14 +100,14 @@ trait Fixtures {
         .builder()
         .addContactPoint(address)
         .withLocalDatacenter("datacenter1")
-      Session.Live.open(builder)
+      CassandraSession.make(builder)
     }
   } yield session).toLayer.mapError(TestFailure.die)
 
   val layer = layaerCassandra >+> layerSession
 
-  def withSession[R](f: service.Session => Task[R]): ZIO[Session, Throwable, R] = ZIO.accessM[Session] { session =>
-    f(session.get)
+  def withSession[R](f: service.CassandraSession => Task[R]): ZIO[Session, Throwable, R] = ZIO.accessM[Session] {
+    session => f(session.get)
   }
 
   def executeBatch(seq: Seq[BoundStatement]): RIO[Session, Unit] = withSession { s =>
