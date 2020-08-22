@@ -1,10 +1,14 @@
+[![Maven][mvnImg]][mvnLink]
+
+[mvnImg]: https://img.shields.io/maven-central/v/io.github.jsfwa/zio-cassandra_2.13.svg
+[mvnLink]: https://mvnrepository.com/artifact/io.github.jsfwa/zio-cassandra
 
 #### zio-cassandra
 
 ```text
-scala = 2.13.2
-cassandra-driver = 4.7.2
-zio = 1.0.0-RC21-2
+scala = 2.13.3
+cassandra-driver = 4.8.0
+zio = 1.0.1
 ```
 
 Inspired by [akka/alpakka-cassandra](https://doc.akka.io/docs/alpakka/current/cassandra.html)
