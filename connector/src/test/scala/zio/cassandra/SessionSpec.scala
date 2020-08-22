@@ -4,8 +4,8 @@ import java.net.InetSocketAddress
 import java.time.Instant
 
 import com.datastax.oss.driver.api.core.cql.{ BatchStatement, BoundStatement, DefaultBatchType }
-import com.datastax.oss.driver.api.core.CqlSession
 import com.dimafeng.testcontainers.CassandraContainer
+import com.typesafe.config.ConfigFactory
 import wvlet.log.{ LogLevel, LogSupport, Logger }
 import zio.{ blocking => _, test => _, _ }
 import zio.container.ZTestContainer
@@ -31,17 +31,18 @@ object SessionSpec extends DefaultRunnableSpec with LogSupport with Fixtures {
           delete      <- session.prepare(deleteQuery)
           select      <- session.prepare(selectQuery)
           emptyResult <- session.bind(select, Seq("user1")) >>= session.selectOne
-          preparedBatchSeq <- ZIO.foreach(0.until(10))(i =>
-                               session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now()))
+          preparedBatchSeq <- ZIO.collectAll(0.until(10) map (i =>
+                               session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now())))
                              )
-
           _         <- executeBatch(preparedBatchSeq)
+          _         <- session.bindAndExecute(insert, Seq("user1", 11.asJava, 21.toString, Instant.now()))
+          _         <- session.bindAndExecute(insert, Seq("user1", 12.asJava, 22.toString, Instant.now()), "slow")
           _         <- session.bind(update, Seq("nope", "user1", 2.asJava)) >>= session.execute
           _         <- session.bind(delete, Seq("user1", 1.asJava)) >>= session.execute
           selectAll <- session.bind(select, Seq("user1")) >>= session.selectAll
         } yield {
           assert(emptyResult)(isNone) &&
-          assert(selectAll.size)(equalTo(9)) &&
+          assert(selectAll.size)(equalTo(11)) &&
           assert(
             selectAll
               .find(r => r.getInt("seq_nr") == 2)
@@ -96,11 +97,8 @@ trait Fixtures {
     cassandra <- ZTestContainer[CassandraContainer].toManaged_
     session <- {
       val address = new InetSocketAddress(cassandra.containerIpAddress, cassandra.mappedPort(9042))
-      val builder = CqlSession
-        .builder()
-        .addContactPoint(address)
-        .withLocalDatacenter("datacenter1")
-      CassandraSession.make(builder)
+      val config  = ConfigFactory.load().getConfig("cassandra.test-driver")
+      CassandraSession.make(config, Seq(address))
     }
   } yield session).toLayer.mapError(TestFailure.die)
 
