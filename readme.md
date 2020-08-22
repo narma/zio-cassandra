@@ -18,6 +18,11 @@ Inspired by [akka/alpakka-cassandra](https://doc.akka.io/docs/alpakka/current/ca
 
 #### Usage
 
+Dependency:
+```scala
+libraryDependencies += "io.github.jsfwa" %% "zio-cassandra" % "1.0.0"
+```
+
 Check driver config documentation on [datastax](https://docs.datastax.com/en/developer/java-driver/4.6/manual/core/)
 
 ```scala
