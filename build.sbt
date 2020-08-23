@@ -3,7 +3,14 @@ lazy val connector =
     .settings(
       testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
       scalaVersion := "2.13.3",
-      organization := "dev.zio.local",
+      organization := "io.github.jsfwa",
+      homepage := Some(url("https://github.com/jsfwa/zio-cassandra")),
+      scmInfo := Some(ScmInfo(url("https://github.com/jsfwa/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
+      developers := List(
+        Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa")),
+        Developer("alzo", "Sergey Rublev", "alzo@alzo.space", url("https://github.com/narma/"))
+      ),
+      licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
       name := "zio-cassandra",
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
@@ -25,9 +32,7 @@ lazy val connector =
         "-Werror",
         "-Wconf:any:error"
       ),
-      sources in (Compile, doc) := Seq.empty,
       publishArtifact in GlobalScope in Test := false,
-      publishArtifact in (Compile, packageDoc) := false,
       parallelExecution in Test := false
     )
 
