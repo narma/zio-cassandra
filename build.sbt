@@ -6,7 +6,10 @@ lazy val connector =
       organization := "io.github.jsfwa",
       homepage := Some(url("https://github.com/jsfwa/zio-cassandra")),
       scmInfo := Some(ScmInfo(url("https://github.com/jsfwa/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
-      developers := List(Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa"))),
+      developers := List(
+        Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa")),
+        Developer("alzo", "Sergey Rublev", "alzo@alzo.space", url("https://github.com/narma/"))
+      ),
       licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
       name := "zio-cassandra",
       libraryDependencies ++=
