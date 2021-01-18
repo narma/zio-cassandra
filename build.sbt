@@ -33,7 +33,8 @@ lazy val connector =
         "-Wconf:any:error"
       ),
       publishArtifact in GlobalScope in Test := false,
-      parallelExecution in Test := false
+      parallelExecution in Test := false,
+      fork in Test := true
     )
 
 lazy val root = (project in file("."))
