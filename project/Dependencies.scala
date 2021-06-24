@@ -8,6 +8,8 @@ object Dependencies {
 
   val javaStreamsInterop = "1.0.3.5"
 
+  val testContainersVersion = "0.38.8"
+
   val cassandraDependencies = Seq(
     "com.datastax.oss" % "java-driver-core" % cassandraDriverVersion
   )
@@ -23,8 +25,8 @@ object Dependencies {
     "org.slf4j"          % "slf4j-jdk14"                     % "1.7.21",
     "dev.zio"            %% "zio-test"                       % zioVersion,
     "dev.zio"            %% "zio-test-sbt"                   % zioVersion,
-    "com.dimafeng"       %% "testcontainers-scala-core"      % "0.37.0",
-    "com.dimafeng"       %% "testcontainers-scala-cassandra" % "0.37.0"
+    "com.dimafeng"       %% "testcontainers-scala-core"      % testContainersVersion,
+    "com.dimafeng"       %% "testcontainers-scala-cassandra" % testContainersVersion
   ).map(_ % Test)
 
 }
