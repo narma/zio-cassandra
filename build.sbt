@@ -1,17 +1,24 @@
+name := "zio-cassandra"
+
+inThisBuild(
+  List(
+    organization := "io.github.jsfwa",
+    scalaVersion := "2.13.6",
+    licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
+    developers := List(
+      Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa")),
+      Developer("alzo", "Sergey Rublev", "alzo@alzo.space", url("https://github.com/narma/"))
+    ),
+    scmInfo := Some(ScmInfo(url("https://github.com/jsfwa/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
+    homepage := Some(url("https://github.com/jsfwa/zio-cassandra"))
+  )
+)
+
+testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
+
 lazy val connector =
   (project in file("connector"))
     .settings(
-      testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework")),
-      scalaVersion := "2.13.6",
-      organization := "io.github.jsfwa",
-      homepage := Some(url("https://github.com/jsfwa/zio-cassandra")),
-      scmInfo := Some(ScmInfo(url("https://github.com/jsfwa/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
-      developers := List(
-        Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa")),
-        Developer("alzo", "Sergey Rublev", "alzo@alzo.space", url("https://github.com/narma/"))
-      ),
-      licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
-      name := "zio-cassandra",
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
           Dependencies.zioDependencies ++
@@ -32,7 +39,7 @@ lazy val connector =
         "-Werror",
         "-Wconf:any:error"
       ),
-      publishArtifact in GlobalScope in Test := false,
+      Test / publishArtifact in GlobalScope := false,
       Test / parallelExecution := false,
       Test / fork := true
     )
