@@ -16,7 +16,7 @@ inThisBuild(
 
 testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
 
-lazy val connector =
+lazy val root =
   (project in file("connector"))
     .settings(
       libraryDependencies ++=
@@ -39,13 +39,7 @@ lazy val connector =
         "-Werror",
         "-Wconf:any:error"
       ),
-      Test / publishArtifact in GlobalScope := false,
       Test / parallelExecution := false,
       Test / fork := true
     )
 
-lazy val root = (project in file("."))
-  .aggregate(connector)
-  .settings(
-    publish / skip := true
-  )
