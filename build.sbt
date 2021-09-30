@@ -17,7 +17,7 @@ inThisBuild(
 testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
 
 lazy val root =
-  (project in file("connector"))
+  (project in file("."))
     .settings(
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
