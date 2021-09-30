@@ -6,7 +6,8 @@ test-output/
 .bloop
 .metals
 project/metals.sbt
-.idea
+.idea/
+.bsp/
 coursier
 **/.DS_Store
 publish.sbt

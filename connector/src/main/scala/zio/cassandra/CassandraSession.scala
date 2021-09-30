@@ -27,7 +27,7 @@ object CassandraSession {
       Task(stmt.bind(bindValues: _*))
 
     override def select(stmt: Statement[_]): Stream[Throwable, ReactiveRow] =
-      underlying.executeReactive(stmt).toStream(qSize = 256)
+      Stream.fromEffect(Task(underlying.executeReactive(stmt).toStream(qSize = 256))).flatten
 
     override def execute(query: String): Task[AsyncResultSet] =
       fromJavaAsync(underlying.executeAsync(query))

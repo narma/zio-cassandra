@@ -2,13 +2,13 @@ import sbt._
 
 object Dependencies {
 
-  val cassandraDriverVersion = "4.8.0"
+  val cassandraDriverVersion = "4.13.0"
 
-  val zioVersion = "1.0.1"
+  val zioVersion = "1.0.12"
 
-  val javaStreamsInterop = "1.0.3.5"
+  val javaStreamsInterop = "1.3.7"
 
-  val testContainersVersion = "0.38.8"
+  val testContainersVersion = "0.39.8"
 
   val cassandraDependencies = Seq(
     "com.datastax.oss" % "java-driver-core" % cassandraDriverVersion
@@ -22,7 +22,7 @@ object Dependencies {
 
   val testCommon = Seq(
     "org.wvlet.airframe" %% "airframe-log"                   % "20.5.1",
-    "org.slf4j"          % "slf4j-jdk14"                     % "1.7.21",
+    "org.slf4j"          % "slf4j-jdk14"                     % "1.7.32",
     "dev.zio"            %% "zio-test"                       % zioVersion,
     "dev.zio"            %% "zio-test-sbt"                   % zioVersion,
     "com.dimafeng"       %% "testcontainers-scala-core"      % testContainersVersion,

@@ -1,38 +1,45 @@
 package zio.cassandra
 
-import java.net.InetSocketAddress
-import java.time.Instant
-
 import com.datastax.oss.driver.api.core.cql.{ BatchStatement, BoundStatement, DefaultBatchType }
 import com.dimafeng.testcontainers.CassandraContainer
 import com.typesafe.config.ConfigFactory
 import wvlet.log.{ LogLevel, LogSupport, Logger }
-import zio.{ blocking => _, test => _, _ }
+import zio.cassandra.service.CassandraSession
 import zio.container.ZTestContainer
-import zio.test.{ DefaultRunnableSpec, _ }
 import zio.test.Assertion._
+import zio.test._
+import zio.{ blocking => _, test => _, _ }
+
+import java.net.InetSocketAddress
+import java.time.Instant
+
+object TestHelpers {
+  final implicit class toJavaInt(val i: Int) extends AnyVal {
+    def asJava: Integer = i.asInstanceOf[java.lang.Integer]
+  }
+}
+
+import zio.cassandra.TestHelpers._
 
 object SessionSpec extends DefaultRunnableSpec with LogSupport with Fixtures {
   Logger.setDefaultLogLevel(LogLevel.INFO)
 
-  implicit class toJavaInt(val i: Int) extends AnyVal {
-    def asJava: Integer = i.asInstanceOf[java.lang.Integer]
-  }
-
   override def spec =
-    suite("Work with cassandra session - complete scenario")(
-      testM("Just create correct service and run queries")(
+    suite("Cassandra session")(
+      testM("complete scenario with multiple queries")(
         for {
+          table       <- ZIO.succeed("test_data")
           session     <- ZIO.service[service.CassandraSession]
-          _           <- session.execute(keyspaceQuery)
-          _           <- session.execute(tableQuery)
-          insert      <- session.prepare(insertQuery)
-          update      <- session.prepare(updateQuery)
-          delete      <- session.prepare(deleteQuery)
-          select      <- session.prepare(selectQuery)
+          _           <- session.execute(tableQuery(table))
+          insert      <- session.prepare(insertQuery(table))
+          update      <- session.prepare(updateQuery(table))
+          delete      <- session.prepare(deleteQuery(table))
+          select      <- session.prepare(selectQuery(table))
           emptyResult <- session.bind(select, Seq("user1")) >>= session.selectOne
-          preparedBatchSeq <- ZIO.collectAll(0.until(10) map (i =>
-                               session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now())))
+          preparedBatchSeq <- ZIO.collectAll(
+                               0.until(10) map (i =>
+                                 session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now()))
+                               )
                              )
           _         <- executeBatch(preparedBatchSeq)
           _         <- session.bindAndExecute(insert, Seq("user1", 11.asJava, 21.toString, Instant.now()))
@@ -49,7 +56,24 @@ object SessionSpec extends DefaultRunnableSpec with LogSupport with Fixtures {
               .map(_.getString("data"))
           )(isSome(equalTo("nope")))
         }
-      )
+      ),
+      testM("selectAll should be reference transparent")(
+        for {
+          session      <- ZIO.service[service.CassandraSession]
+          select       <- session.prepare(selectQuery("prepared_data"))
+          effect       = (session.bind(select, Seq("user1")) >>= session.selectAll).map(_.map(_.getString(0)))
+          resultOne    <- effect
+          resultSecond <- effect
+        } yield assert(resultOne)(equalTo(resultSecond))
+      ),
+      testM("select should be reference transparent")(for {
+        session      <- ZIO.service[service.CassandraSession]
+        select       <- session.prepare(selectQuery("prepared_data"))
+        statement    <- session.bind(select, Seq("user1"))
+        stream       = session.select(statement).map(_.getString(0))
+        resultOne    <- stream.runCollect
+        resultSecond <- stream.runCollect
+      } yield assert(resultOne)(equalTo(resultSecond)))
     ).provideCustomLayerShared(layer)
 }
 
@@ -61,9 +85,7 @@ trait Fixtures {
        |  WITH REPLICATION =
        |    {'class' : 'SimpleStrategy', 'replication_factor' : 1}""".stripMargin
 
-  val table = "test_table"
-
-  val tableQuery =
+  def tableQuery(table: String) =
     s"""CREATE TABLE IF NOT EXISTS $keyspace.$table(
        |user_id text,
        |seq_nr int,
@@ -71,22 +93,22 @@ trait Fixtures {
        |created_at timestamp,
        |PRIMARY KEY (user_id, seq_nr))""".stripMargin
 
-  val insertQuery =
+  def insertQuery(table: String) =
     s"""
        |INSERT INTO $keyspace.$table (user_id, seq_nr, data, created_at) values (?, ?, ?, ?)
        |""".stripMargin
 
-  val updateQuery =
+  def updateQuery(table: String) =
     s"""
        |UPDATE $keyspace.$table SET data = ? WHERE user_id = ? and seq_nr = ?
        |""".stripMargin
 
-  val deleteQuery =
+  def deleteQuery(table: String) =
     s"""
        |DELETE FROM $keyspace.$table WHERE user_id = ? and seq_nr = ?
        |""".stripMargin
 
-  val selectQuery =
+  def selectQuery(table: String) =
     s"""
        |SELECT user_id, seq_nr, data, created_at FROM $keyspace.$table WHERE user_id = ?
        |""".stripMargin
@@ -100,9 +122,26 @@ trait Fixtures {
       val config  = ConfigFactory.load().getConfig("cassandra.test-driver")
       CassandraSession.make(config, Seq(address))
     }
+    _ <- prepareTestSession(session).toManaged_
   } yield session).toLayer.mapError(TestFailure.die)
 
   val layer = layaerCassandra >+> layerSession
+
+  def prepareTestSession(session: CassandraSession): Task[Unit] =
+    for {
+      table  <- ZIO.succeed("prepared_data")
+      _      <- session.execute(keyspaceQuery)
+      _      <- session.execute(tableQuery(table))
+      insert <- session.prepare(insertQuery(table))
+      preparedBatchSeq <- ZIO.foreach(0.until(10).toList) { i =>
+                           session.bind(insert, Seq("user1", i.asJava, i.toString, Instant.now()))
+                         }
+      batch = BatchStatement
+        .builder(DefaultBatchType.LOGGED)
+        .addStatements(preparedBatchSeq: _*)
+        .build()
+      _ <- session.execute(batch)
+    } yield ()
 
   def withSession[R](f: service.CassandraSession => Task[R]): ZIO[Session, Throwable, R] = ZIO.accessM[Session] {
     session => f(session.get)
