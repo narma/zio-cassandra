@@ -8,9 +8,9 @@
 #### zio-cassandra
 
 ```text
-scala = 2.13.3
-cassandra-driver = 4.8.0
-zio = 1.0.1
+scala = 2.13.6
+cassandra-driver = 4.13.0
+zio = 1.0.12
 ```
 
 Inspired by [akka/alpakka-cassandra](https://doc.akka.io/docs/alpakka/current/cassandra.html)
@@ -20,7 +20,7 @@ Inspired by [akka/alpakka-cassandra](https://doc.akka.io/docs/alpakka/current/ca
 
 Dependency:
 ```scala
-libraryDependencies += "io.github.jsfwa" %% "zio-cassandra" % "1.0.0"
+libraryDependencies += "io.github.jsfwa" %% "zio-cassandra" % "1.0.6"
 ```
 
 Check driver config documentation on [datastax](https://docs.datastax.com/en/developer/java-driver/4.6/manual/core/)

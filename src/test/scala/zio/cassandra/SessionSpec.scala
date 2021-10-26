@@ -1,6 +1,7 @@
 package zio.cassandra
 
 import com.datastax.oss.driver.api.core.cql.{ BatchStatement, BoundStatement, DefaultBatchType }
+import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException
 import com.dimafeng.testcontainers.CassandraContainer
 import com.typesafe.config.ConfigFactory
 import wvlet.log.{ LogLevel, LogSupport, Logger }
@@ -73,7 +74,21 @@ object SessionSpec extends DefaultRunnableSpec with LogSupport with Fixtures {
         stream       = session.select(statement).map(_.getString(0))
         resultOne    <- stream.runCollect
         resultSecond <- stream.runCollect
-      } yield assert(resultOne)(equalTo(resultSecond)))
+      } yield assert(resultOne)(equalTo(resultSecond))),
+      testM("select should emit chunks sized equal to statement pageSize")(for {
+        session    <- ZIO.service[service.CassandraSession]
+        select     <- session.prepare(selectQuery("prepared_data"))
+        statement  <- session.bind(select, Seq("user1"))
+        stream     = session.select(statement.setPageSize(2)).map(_.getString(0))
+        chunkSizes <- stream.mapChunks(ch => Chunk.single(ch.size)).runCollect
+      } yield assert(chunkSizes)(forall(equalTo(2))) && assert(chunkSizes.size)(equalTo(5))),
+      testM("should return error on invalid query")(
+        for {
+          session <- ZIO.service[service.CassandraSession]
+          select  <- session.prepare(s"select column_not_exists from $keyspace.prepared_data where user_id = 1").either
+        } yield assert(select)(isLeft(hasMessage(equalTo("Undefined column name column_not_exists")))) &&
+          assert(select)(isLeft(isSubtype[InvalidQueryException](Assertion.anything)))
+      )
     ).provideCustomLayerShared(layer)
 }
 

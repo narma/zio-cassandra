@@ -6,8 +6,6 @@ object Dependencies {
 
   val zioVersion = "1.0.12"
 
-  val javaStreamsInterop = "1.3.7"
-
   val testContainersVersion = "0.39.8"
 
   val cassandraDependencies = Seq(
@@ -16,8 +14,7 @@ object Dependencies {
 
   val zioDependencies = Seq(
     "dev.zio" %% "zio"                         % zioVersion,
-    "dev.zio" %% "zio-streams"                 % zioVersion,
-    "dev.zio" %% "zio-interop-reactivestreams" % javaStreamsInterop
+    "dev.zio" %% "zio-streams"                 % zioVersion
   )
 
   val testCommon = Seq(

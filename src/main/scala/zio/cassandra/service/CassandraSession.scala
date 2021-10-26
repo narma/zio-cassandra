@@ -1,9 +1,8 @@
 package zio.cassandra.service
 
-import com.datastax.dse.driver.api.core.cql.reactive.ReactiveRow
 import com.datastax.oss.driver.api.core.cql._
 import zio._
-import zio.stream.{ Stream, ZStream }
+import zio.stream.{Stream, ZStream}
 
 trait CassandraSession {
   def prepare(stmt: String): Task[PreparedStatement]
@@ -14,7 +13,7 @@ trait CassandraSession {
 
   def execute(query: String): Task[AsyncResultSet]
 
-  def select(stmt: Statement[_]): Stream[Throwable, ReactiveRow]
+  def select(stmt: Statement[_]): Stream[Throwable, Row]
 
   // short-cuts
   def bind(stmt: PreparedStatement, bindValues: Seq[AnyRef], profileName: String): Task[BoundStatement] =
@@ -32,14 +31,14 @@ trait CassandraSession {
       res   <- execute(bound)
     } yield res
 
-  def bindAndSelect(stmt: PreparedStatement, bindValues: Seq[AnyRef]): Stream[Throwable, ReactiveRow] =
+  def bindAndSelect(stmt: PreparedStatement, bindValues: Seq[AnyRef]): Stream[Throwable, Row] =
     ZStream.fromEffect(bind(stmt, bindValues)).flatMap(select)
 
   def bindAndSelect(
     stmt: PreparedStatement,
     bindValues: Seq[AnyRef],
     profileName: String
-  ): Stream[Throwable, ReactiveRow] =
+  ): Stream[Throwable, Row] =
     ZStream.fromEffect(bind(stmt, bindValues, profileName)).flatMap(select)
 
   def bindAndSelectAll(stmt: PreparedStatement, bindValues: Seq[AnyRef]): Task[Seq[Row]] =
