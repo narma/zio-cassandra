@@ -1,8 +1,10 @@
 package zio.cassandra.service
 
 import com.datastax.oss.driver.api.core.cql._
+import com.datastax.oss.driver.api.core.metrics.Metrics
+
 import zio._
-import zio.stream.{Stream, ZStream}
+import zio.stream.{ Stream, ZStream }
 
 trait CassandraSession {
   def prepare(stmt: String): Task[PreparedStatement]
@@ -14,6 +16,8 @@ trait CassandraSession {
   def execute(query: String): Task[AsyncResultSet]
 
   def select(stmt: Statement[_]): Stream[Throwable, Row]
+
+  def getMetrics: Task[Option[Metrics]]
 
   // short-cuts
   def bind(stmt: PreparedStatement, bindValues: Seq[AnyRef], profileName: String): Task[BoundStatement] =

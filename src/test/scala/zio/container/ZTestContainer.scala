@@ -3,6 +3,7 @@ package zio.container
 import com.dimafeng.testcontainers.CassandraContainer
 import org.testcontainers.lifecycle.Startable
 import org.testcontainers.utility.DockerImageName
+
 import zio._
 import zio.blocking.{ effectBlocking, Blocking }
 import zio.test.TestFailure

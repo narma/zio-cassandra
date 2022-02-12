@@ -40,6 +40,8 @@ lazy val root =
         "-Wconf:any:error"
       ),
       Test / parallelExecution := false,
-      Test / fork := true
+      Test / fork := true,
+      ThisBuild / scalafixDependencies += "com.nequissimus" %% "sort-imports" % "0.5.5",
+      semanticdbEnabled := true,
+      semanticdbVersion := scalafixSemanticdb.revision
     )
-

@@ -1,21 +1,22 @@
 package zio.cassandra
 
+import java.net.InetSocketAddress
+import java.time.Instant
+
 import com.datastax.oss.driver.api.core.cql.{ BatchStatement, BoundStatement, DefaultBatchType }
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException
 import com.dimafeng.testcontainers.CassandraContainer
 import com.typesafe.config.ConfigFactory
 import wvlet.log.{ LogLevel, LogSupport, Logger }
+
 import zio.cassandra.service.CassandraSession
 import zio.container.ZTestContainer
 import zio.test.Assertion._
 import zio.test._
 import zio.{ blocking => _, test => _, _ }
 
-import java.net.InetSocketAddress
-import java.time.Instant
-
 object TestHelpers {
-  final implicit class toJavaInt(val i: Int) extends AnyVal {
+  final implicit class toJavaInt(private val i: Int) extends AnyVal {
     def asJava: Integer = i.asInstanceOf[java.lang.Integer]
   }
 }
