@@ -2,15 +2,15 @@ name := "zio-cassandra"
 
 inThisBuild(
   List(
-    organization := "io.github.jsfwa",
-    scalaVersion := "2.13.6",
+    organization := "st.alzo",
+    scalaVersion := "2.13.8",
     licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0")),
-    developers := List(
+    developers   := List(
       Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa")),
       Developer("alzo", "Sergey Rublev", "alzo@alzo.space", url("https://github.com/narma/"))
     ),
-    scmInfo := Some(ScmInfo(url("https://github.com/jsfwa/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
-    homepage := Some(url("https://github.com/jsfwa/zio-cassandra"))
+    scmInfo      := Some(ScmInfo(url("https://github.com/narma/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
+    homepage     := Some(url("https://github.com/narma/zio-cassandra"))
   )
 )
 
@@ -18,11 +18,15 @@ testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
 
 lazy val root =
   (project in file("."))
+    .configs(IntegrationTest)
     .settings(
+      Defaults.itSettings,
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
           Dependencies.zioDependencies ++
-          Dependencies.testCommon,
+          Dependencies.commonDependencies ++
+          Dependencies.testCommon ++
+          Dependencies.testIntegrationDeps,
       scalacOptions ++= Seq(
         "-encoding",
         "utf-8",
@@ -39,9 +43,7 @@ lazy val root =
         "-Werror",
         "-Wconf:any:error"
       ),
+      Compile / console / scalacOptions --= Seq("-Wconf:any:error", "-Werror", "-Xfatal-warnings", "-Ywarn-unused"),
       Test / parallelExecution := false,
-      Test / fork := true,
-      ThisBuild / scalafixDependencies += "com.nequissimus" %% "sort-imports" % "0.5.5",
-      semanticdbEnabled := true,
-      semanticdbVersion := scalafixSemanticdb.revision
+      Test / fork              := true
     )
