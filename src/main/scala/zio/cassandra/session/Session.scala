@@ -93,7 +93,7 @@ object Session {
     override def keyspace: Option[CqlIdentifier] = underlying.getKeyspace.toScala
   }
 
-  def make(builder: CqlSessionBuilder): TaskManaged[Session] =
+  def make(builder: => CqlSessionBuilder): TaskManaged[Session] =
     ZManaged
       .make(Task.fromCompletionStage(builder.buildAsync())) { session =>
         Task.fromCompletionStage(session.closeAsync()).orDie

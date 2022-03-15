@@ -1,9 +1,8 @@
-package zio.cassandra.session.cql.udt
+package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.cql.Row
 import com.datastax.oss.driver.api.core.data.UdtValue
-import zio.cassandra.session.cql.{ CassandraTypeMapper, Reads }
-import zio.cassandra.session.cql.udt.FromUdtValue.{ make, makeWithFieldName }
+import zio.cassandra.session.cql.FromUdtValue.{ make, makeWithFieldName }
 
 import scala.annotation.nowarn
 

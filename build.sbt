@@ -45,5 +45,6 @@ lazy val root =
       ),
       Compile / console / scalacOptions --= Seq("-Wconf:any:error", "-Werror", "-Xfatal-warnings", "-Ywarn-unused"),
       Test / parallelExecution := false,
-      Test / fork              := true
+      Test / fork              := false,
+      IntegrationTest / fork   := true
     )

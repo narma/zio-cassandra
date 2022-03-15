@@ -9,8 +9,6 @@ import java.nio.ByteBuffer
 import java.time.LocalDate
 import scala.jdk.CollectionConverters._
 
-import udt.{ FieldName, FromUdtValue, ToUdtValue }
-
 /** A compile-time safe alternative to reflection for primitive Cassandra types This typeclass is used to hold onto the
   * associated Cassandra types associated with the Scala types for the underlying Datastax API and handle boxing where
   * needed
@@ -228,5 +226,24 @@ object CassandraTypeMapper       {
           (kEv.fromCassandra(kC, keyDataType), vEv.fromCassandra(vC, valueDataType))
         }.toMap
       }
+    }
+
+  implicit def optionCassandraTypeMapper[A, Cass](implicit
+    ev: CassandraTypeMapper.WithCassandra[A, Cass]
+  ): CassandraTypeMapper.WithCassandra[Option[A], Cass] =
+    new CassandraTypeMapper[Option[A]] {
+      override type Cassandra = Cass
+
+      override def classType: Class[Cassandra] = ev.classType
+
+      // NOTE: This is safe to do as the underlying Datastax driver allows you to use null values to represent the absence of data
+      override def toCassandra(in: Option[A], dataType: DataType): Cassandra =
+        in.map(ev.toCassandra(_, dataType)) match {
+          case Some(value) => value
+          case None        => null.asInstanceOf[Cassandra]
+        }
+
+      override def fromCassandra(in: Cassandra, dataType: DataType): Option[A] =
+        Option(in).map(ev.fromCassandra(_, dataType))
     }
 }

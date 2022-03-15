@@ -1,4 +1,4 @@
-package zio.cassandra.session.cql.udt
+package zio.cassandra.session.cql
 
 /** This type is used by FromUdtValue and ToUdtValue to decide whether to utilize schema data when reading and writing
   * data from the Datastax DataType

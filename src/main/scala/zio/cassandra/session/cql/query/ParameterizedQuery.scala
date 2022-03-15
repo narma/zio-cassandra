@@ -2,6 +2,7 @@ package zio.cassandra.session.cql.query
 
 import com.datastax.oss.driver.api.core.cql.BoundStatement
 import shapeless.HList
+import shapeless.ops.hlist.Prepend
 import zio.Task
 import zio.cassandra.session.cql.{ Binder, Reads }
 import zio.cassandra.session.Session
@@ -20,4 +21,17 @@ case class ParameterizedQuery[V <: HList: Binder, R: Reads] private (template: Q
   def config(config: BoundStatement => BoundStatement): ParameterizedQuery[V, R] =
     ParameterizedQuery[V, R](template.config(config), values)
   def stripMargin: ParameterizedQuery[V, R]                                      = ParameterizedQuery[V, R](this.template.stripMargin, values)
+
+  def ++[W <: HList, Out <: HList](that: ParameterizedQuery[W, R])(implicit
+    prepend: Prepend.Aux[V, W, Out],
+    binderForW: Binder[W],
+    binderForOut: Binder[Out]
+  ): ParameterizedQuery[Out, R] = concat(that)
+
+  def concat[W <: HList, Out <: HList](that: ParameterizedQuery[W, R])(implicit
+    prepend: Prepend.Aux[V, W, Out],
+    binderForW: Binder[W],
+    binderForOut: Binder[Out]
+  ): ParameterizedQuery[Out, R] =
+    ParameterizedQuery[Out, R](this.template ++ that.template, prepend(this.values, that.values))
 }

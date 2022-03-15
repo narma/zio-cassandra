@@ -1,10 +1,9 @@
-package zio.cassandra.session.cql.udt
+package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.cql.BoundStatement
 import com.datastax.oss.driver.api.core.data.UdtValue
-import zio.cassandra.session.cql.{ Binder, CassandraTypeMapper }
-import zio.cassandra.session.cql.udt.ToUdtValue.{ make, makeWithFieldName }
+import zio.cassandra.session.cql.ToUdtValue.{ make, makeWithFieldName }
 
 import scala.annotation.nowarn
 
