@@ -10,7 +10,8 @@ inThisBuild(
       Developer("alzo", "Sergey Rublev", "alzo@alzo.space", url("https://github.com/narma/"))
     ),
     scmInfo      := Some(ScmInfo(url("https://github.com/narma/zio-cassandra"), "git@github.com:jsfwa/zio-cassandra.git")),
-    homepage     := Some(url("https://github.com/narma/zio-cassandra"))
+    homepage     := Some(url("https://github.com/narma/zio-cassandra")),
+    sonatypeCredentialHost := "s01.oss.sonatype.org"
   )
 )
 
