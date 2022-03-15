@@ -2,13 +2,13 @@ package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.cql.Row
-import com.datastax.oss.driver.api.core.data.{GettableByIndex, UdtValue}
-import com.datastax.oss.driver.internal.core.`type`.{DefaultListType, DefaultMapType, DefaultSetType}
-import shapeless.{::, Generic, HList, HNil}
-import zio.{Task, ZIO}
+import com.datastax.oss.driver.api.core.data.{ GettableByIndex, UdtValue }
+import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
+import shapeless.{ ::, Generic, HList, HNil }
+import zio.{ Task, ZIO }
 
 import java.nio.ByteBuffer
-import java.time.{Instant, LocalDate}
+import java.time.{ Instant, LocalDate }
 import java.util.UUID
 import scala.jdk.CollectionConverters._
 
@@ -29,7 +29,7 @@ trait Reads[T] { self =>
 }
 
 class UnexpectedNullValue(row: GettableByIndex, index: Int) extends RuntimeException() {
-  override def getMessage: String = {
+  override def getMessage: String =
 //    val cl       = row.getColumnDefinitions.get(index)
 //    val table    = cl.getTable.toString
 //    val column   = cl.getName.toString
@@ -38,7 +38,6 @@ class UnexpectedNullValue(row: GettableByIndex, index: Int) extends RuntimeExcep
 
 //    s"Read NULL value from column $column with type $tpe at $keyspace.$table. Row ${row.getFormattedContents}"
     s"Read NULL value from column at index $index for row $row"
-  }
 }
 
 object Reads extends ReadsLowerPriority with ReadsLowestPriority {
@@ -46,7 +45,7 @@ object Reads extends ReadsLowerPriority with ReadsLowestPriority {
 
   implicit val rowReads: Reads[Row] = new Reads[Row] {
     override def readUnsafe(row: GettableByIndex, index: Int): Row = row.asInstanceOf[Row]
-    override def nextIndex(index: Int): Int            = index
+    override def nextIndex(index: Int): Int                        = index
   }
 
   implicit val stringReads: Reads[String]         = (row: GettableByIndex, index: Int) => row.getString(index)
@@ -115,7 +114,7 @@ trait ReadsLowestPriority {
   implicit val hNilParser: Reads[HNil] = new Reads[HNil] {
     override def readUnsafe(row: GettableByIndex, index: Int): HNil = HNil
     override def read(row: GettableByIndex, index: Int): Task[HNil] = Task.succeed(HNil)
-    override def nextIndex(index: Int): Int = index
+    override def nextIndex(index: Int): Int                         = index
   }
 
   implicit def hConsParser[H: Reads, T <: HList: Reads]: Reads[H :: T] = new Reads[H :: T] {
@@ -143,7 +142,7 @@ trait ReadsLowestPriority {
       gen.from(rep)
     }
 
-    override def read(row: GettableByIndex, index: Int): Task[A] = {
+    override def read(row: GettableByIndex, index: Int): Task[A] =
       if (row.isNull(index)) {
         Task.fail(new UnexpectedNullValue(row, index))
       } else {
@@ -155,6 +154,5 @@ trait ReadsLowestPriority {
           reprParser.read(row, index).map(gen.from)
         }
       }
-    }
   }
 }

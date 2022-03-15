@@ -1,6 +1,7 @@
 package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
+import com.datastax.oss.driver.api.core.data.UdtValue
 import zio.cassandra.session.Session
 import zio.duration._
 import zio.stream.Stream
@@ -12,6 +13,8 @@ import java.time.{ LocalDate, LocalTime }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import zio.test.TestAspect.ignore
+
+import scala.jdk.CollectionConverters.{ IterableHasAsScala, SetHasAsJava }
 
 object CqlSpec {
 
@@ -393,16 +396,20 @@ object CqlSpec {
 
           for {
             session <- ZIO.service[Session]
-            _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, {weight:160.0,height:NULL,datapoints:NULL})"
-                         .execute(session)
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, {weight:160.0,height:NULL,datapoints:NULL})"
+                .execute(session)
             result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                          .as[PersonOptAttribute]
                          .selectFirst(session)
           } yield assertTrue(result.contains(data))
-        } @@ ignore , // todo: why datapoints which is frozen<set<int>> returns as Some(Set()) here?
+        } @@ ignore, // todo: why datapoints which is frozen<set<int>> returns as Some(Set()) here?
         testM("raise error when inner non-optional value is null for non-optional type") {
           val data =
-            PersonOptAttribute(personAttributeIdxCounter.incrementAndGet(), OptBasicInfo(Some(160.0), None, Some(Set(1))))
+            PersonOptAttribute(
+              personAttributeIdxCounter.incrementAndGet(),
+              OptBasicInfo(Some(160.0), None, Some(Set(1)))
+            )
 
           for {
             session <- ZIO.service[Session]
@@ -413,7 +420,7 @@ object CqlSpec {
                          .selectFirst(session)
                          .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
-        } @@ ignore // fixme
+        } @@ ignore  // fixme
       )
     )
   )

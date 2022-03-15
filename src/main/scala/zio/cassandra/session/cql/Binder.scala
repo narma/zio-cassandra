@@ -1,11 +1,12 @@
 package zio.cassandra.session.cql
 
 //import com.datastax.oss.driver.api.core.`type`.UserDefinedType
-import com.datastax.oss.driver.api.core.data.{SettableByIndex, UdtValue}
-import shapeless.{::, HList, HNil, Widen}
+import com.datastax.oss.driver.api.core.`type`.UserDefinedType
+import com.datastax.oss.driver.api.core.data.{ SettableByIndex, UdtValue }
+import shapeless.{ ::, HList, HNil, Widen }
 
 import java.nio.ByteBuffer
-import java.time.{Instant, LocalDate}
+import java.time.{ Instant, LocalDate }
 import java.util.UUID
 import scala.annotation.implicitNotFound
 
@@ -91,21 +92,43 @@ object Binder extends BinderLowerPriority with BinderLowestPriority {
   }
 
   implicit val userDefinedTypeValueBinder: Binder[UdtValue] = new Binder[UdtValue] {
-      override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: UdtValue): S =
-        statement.setUdtValue(index, value)
-    }
+    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: UdtValue): S =
+      statement.setUdtValue(index, value)
+  }
 
   implicit def optionBinder[T: Binder]: Binder[Option[T]] = new Binder[Option[T]] {
-    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: Option[T]): S= value match {
+    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: Option[T]): S = value match {
       case Some(x) => Binder[T].bind(statement, index, x)
       case None    => statement.setToNull(index)
     }
   }
 
-
   implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
     override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: X): S =
       Binder[T].bind(statement, index, wd.apply(value))
+  }
+
+  final implicit class UdtValueBinderOps(private val udtBinder: Binder[UdtValue]) extends AnyVal {
+
+    /** This is necessary for UDT values as you are not allowed to safely create a UDT value, instead you use the
+      * prepared statement's variable definitions to retrieve a UserDefinedType that can be used as a constructor for a
+      * UdtValue
+      *
+      * @param f
+      *   is a function that accepts the input value A along with a constructor that you use to build the UdtValue that
+      *   gets sent to Cassandra
+      * @tparam A
+      * @return
+      */
+    def contramapUDT[A](f: (A, UserDefinedType) => UdtValue): Binder[A] = new Binder[A] {
+      override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: A): S = {
+        val udtValue = f(
+          value,
+          statement.getType(index).asInstanceOf[UserDefinedType]
+        )
+        udtBinder.bind(statement, index, udtValue)
+      }
+    }
   }
 
 }
@@ -120,7 +143,7 @@ trait BinderLowerPriority {
     * @return
     */
   implicit def deriveBinderFromCassandraTypeMapper[A](implicit ev: CassandraTypeMapper[A]): Binder[A] = new Binder[A] {
-    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: A): S =  {
+    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: A): S = {
       val datatype  = statement.getType(index)
       val cassandra = ev.toCassandra(value, datatype)
       statement.set(index, cassandra, ev.classType)
@@ -134,7 +157,7 @@ trait BinderLowestPriority {
   }
   implicit def hConsBinder[H: Binder, T <: HList: Binder]: Binder[H :: T] = new Binder[H :: T] {
     override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: H :: T): S = {
-      val applied = Binder[H].bind(statement, index, value.head)
+      val applied   = Binder[H].bind(statement, index, value.head)
       val nextIndex = Binder[H].nextIndex(index)
       Binder[T].bind(applied, nextIndex, value.tail)
     }

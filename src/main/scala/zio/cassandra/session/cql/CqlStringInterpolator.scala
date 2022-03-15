@@ -85,8 +85,8 @@ class CqlStringInterpolator(ctx: StringContext) {
         values.foldLeft((in, 0)) { case ((current, index), bv: BoundValue[a]) =>
           val binder: Binder[a] = bv.ev
           val value: a          = bv.value
-          val statement = binder.bind(current, index, value)
-          val nextIndex = binder.nextIndex(index)
+          val statement         = binder.bind(current, index, value)
+          val nextIndex         = binder.nextIndex(index)
           (statement, nextIndex)
         }
       configuredBoundStatement

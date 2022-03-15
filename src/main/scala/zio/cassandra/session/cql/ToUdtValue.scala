@@ -1,8 +1,8 @@
 package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
-import com.datastax.oss.driver.api.core.data.{SettableByIndex, UdtValue}
-import zio.cassandra.session.cql.ToUdtValue.{make, makeWithFieldName}
+import com.datastax.oss.driver.api.core.data.{ SettableByIndex, UdtValue }
+import zio.cassandra.session.cql.ToUdtValue.{ make, makeWithFieldName }
 
 import scala.annotation.nowarn
 

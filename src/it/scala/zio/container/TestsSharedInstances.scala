@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters.IterableHasAsJava
 
 trait TestsSharedInstances { self: AbstractRunnableSpec =>
 
-  val keyspace  = "tests"
+  val keyspace = "tests"
 
   def migrateSession(session: Session): RIO[Blocking, Unit] = {
     val migrations = Stream
