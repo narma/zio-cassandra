@@ -20,5 +20,5 @@ jobs:
             docker_channel: stable
             docker_version: 20.10
       - name: Run tests
-        run: sbt test
+        run: sbt +IntegrationTest/test
 

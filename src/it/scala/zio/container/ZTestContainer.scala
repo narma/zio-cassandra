@@ -21,8 +21,7 @@ object ZTestContainer {
         container.start()
         container
       }
-    }(c => effectBlocking(c.stop()).orDie)
-
-  def apply[C: Tag]: RIO[Has[C], C] =
-    ZIO.service[C]
+    } { c =>
+      effectBlocking(c.stop()).orDie
+    }
 }
