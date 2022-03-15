@@ -30,14 +30,18 @@ trait Reads[T] { self =>
 
 class UnexpectedNullValue(row: GettableByIndex, index: Int) extends RuntimeException() {
   override def getMessage: String =
-//    val cl       = row.getColumnDefinitions.get(index)
-//    val table    = cl.getTable.toString
-//    val column   = cl.getName.toString
-//    val keyspace = cl.getKeyspace.toString
-//    val tpe      = cl.getType.asCql(true, true)
+    row match {
+      case row: Row =>
+        val cl       = row.getColumnDefinitions.get(index)
+        val table    = cl.getTable.toString
+        val column   = cl.getName.toString
+        val keyspace = cl.getKeyspace.toString
+        val tpe      = cl.getType.asCql(true, true)
 
-//    s"Read NULL value from column $column with type $tpe at $keyspace.$table. Row ${row.getFormattedContents}"
-    s"Read NULL value from column at index $index for row $row"
+        s"Read NULL value from column $column with type $tpe at $keyspace.$table. Row ${row.getFormattedContents}"
+      case _ =>
+        s"Read NULL value from column at index $index"
+    }
 }
 
 object Reads extends ReadsLowerPriority with ReadsLowestPriority {
