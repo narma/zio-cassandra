@@ -10,5 +10,5 @@ class PreparedQuery[V <: HList: Binder, R: Reads] private[cql] (
   statement: PreparedStatement,
   config: BoundStatement => BoundStatement
 ) extends ProductArgs {
-  def applyProduct(values: V) = new Query[R](session, Binder[V].bind(config(statement.bind()), 0, values)._1)
+  def applyProduct(values: V) = new Query[R](session, Binder[V].bind(config(statement.bind()), 0, values))
 }

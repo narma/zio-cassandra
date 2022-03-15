@@ -45,7 +45,7 @@ object SessionSpec {
       for {
         session <- ZIO.service[Session]
         result  <- session.prepare(s"select column404 FROM $keyspace.test_data WHERE id = :id").either
-      } yield assert(result)(isLeft(hasMessage(equalTo("Undefined column name column404")))) &&
+      } yield assert(result)(isLeft(hasMessage(containsString("Undefined column name column404")))) &&
         assert(result)(isLeft(isSubtype[InvalidQueryException](Assertion.anything)))
     },
     testM("select should return prepared data") {

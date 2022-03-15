@@ -2,8 +2,9 @@ package zio.container
 
 import com.datastax.oss.driver.api.core.cql.SimpleStatement
 import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
+import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader
 import com.dimafeng.testcontainers.CassandraContainer
-import org.testcontainers.utility.DockerImageName
+import com.typesafe.config.ConfigFactory
 import zio._
 import zio.blocking.Blocking
 import zio.cassandra.session.Session
@@ -16,7 +17,6 @@ import scala.jdk.CollectionConverters.IterableHasAsJava
 trait TestsSharedInstances { self: AbstractRunnableSpec =>
 
   val keyspace  = "tests"
-  val container = CassandraContainer(DockerImageName.parse("cassandra:3.11.11"))
 
   def migrateSession(session: Session): RIO[Blocking, Unit] = {
     val migrations = Stream
@@ -33,7 +33,6 @@ trait TestsSharedInstances { self: AbstractRunnableSpec =>
 
     for {
       _          <- ZIO.debug("start migrations")
-      _          <- session.execute(s"use $keyspace")
       migrations <- migrations
 
       _ <- ZIO.foreach_(migrations) { migration =>
@@ -63,10 +62,12 @@ trait TestsSharedInstances { self: AbstractRunnableSpec =>
   val layerSession = (for {
     cassandra <- ZManaged.service[CassandraContainer]
     address    = new InetSocketAddress(cassandra.containerIpAddress, cassandra.mappedPort(9042))
+    config    <- Task(ConfigFactory.load().getConfig("cassandra.test-driver")).toManaged_
     builder    = CqlSession
                    .builder()
                    .addContactPoints(Seq(address).asJavaCollection)
                    .withLocalDatacenter("datacenter1")
+                   .withConfigLoader(new DefaultDriverConfigLoader(() => config, false))
                    .withKeyspace(keyspace)
     _         <- ensureKeyspaceExists(builder).toManaged_
 
