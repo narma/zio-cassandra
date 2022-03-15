@@ -1,20 +1,17 @@
 package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
-import com.datastax.oss.driver.api.core.data.UdtValue
 import zio.cassandra.session.Session
 import zio.duration._
 import zio.stream.Stream
-import zio.test.Assertion.{ isLeft, isSubtype }
+import zio.test.Assertion.{isLeft, isSubtype}
+import zio.test.TestAspect.ignore
 import zio.test._
-import zio.{ Chunk, Task, ZIO }
+import zio.{Chunk, Task, ZIO}
 
-import java.time.{ LocalDate, LocalTime }
+import java.time.{LocalDate, LocalTime}
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
-import zio.test.TestAspect.ignore
-
-import scala.jdk.CollectionConverters.{ IterableHasAsScala, SetHasAsJava }
 
 object CqlSpec {
 
