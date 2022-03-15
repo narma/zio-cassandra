@@ -9,10 +9,13 @@ import zio.duration._
 import java.time.{ LocalDate, LocalTime }
 import java.util.UUID
 import zio.stream.Stream
+import zio.test.Assertion.{ isLeft, isSubtype }
+// import zio.test.TestAspect.ignore
 
 object CqlSpec {
 
   case class Data(id: Long, data: String)
+  case class OptData(id: Long, data: Option[String])
 
   case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
   object BasicInfo {
@@ -298,6 +301,32 @@ object CqlSpec {
         _       <- insert(session, data)
         result  <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst(session)
       } yield assertTrue(result.isDefined && result.get == data)
-    }
+    },
+    suite("handle NULL values")(
+      testM("return None if a type is Option") {
+        for {
+          session <- ZIO.service[Session]
+          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst(session)
+        } yield assertTrue(result.isDefined && result.get.isEmpty)
+      },
+      testM("raise error if a type is not an Option") {
+        for {
+          session <- ZIO.service[Session]
+          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst(session).either
+        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      },
+      testM("return value for field in case class have Option type") {
+        for {
+          session <- ZIO.service[Session]
+          row     <- cql"select id, data FROM tests.test_data WHERE id = 0".as[OptData].selectFirst(session)
+        } yield assertTrue(row.isDefined && row.get.data.isEmpty)
+      },
+      testM("raise error if field in case class have Option type") {
+        for {
+          session <- ZIO.service[Session]
+          result  <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst(session).either
+        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      }
+    )
   )
 }

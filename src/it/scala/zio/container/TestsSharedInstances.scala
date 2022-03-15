@@ -2,7 +2,9 @@ package zio.container
 
 import com.datastax.oss.driver.api.core.cql.SimpleStatement
 import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
+import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader
 import com.dimafeng.testcontainers.CassandraContainer
+import com.typesafe.config.ConfigFactory
 import org.testcontainers.utility.DockerImageName
 import zio._
 import zio.blocking.Blocking
@@ -63,10 +65,12 @@ trait TestsSharedInstances { self: AbstractRunnableSpec =>
   val layerSession = (for {
     cassandra <- ZManaged.service[CassandraContainer]
     address    = new InetSocketAddress(cassandra.containerIpAddress, cassandra.mappedPort(9042))
+    config    <- Task(ConfigFactory.load().getConfig("cassandra.test-driver")).toManaged_
     builder    = CqlSession
                    .builder()
                    .addContactPoints(Seq(address).asJavaCollection)
                    .withLocalDatacenter("datacenter1")
+                   .withConfigLoader(new DefaultDriverConfigLoader(() => config, false))
                    .withKeyspace(keyspace)
     _         <- ensureKeyspaceExists(builder).toManaged_
 
