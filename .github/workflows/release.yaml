@@ -14,7 +14,6 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
-      - uses: olafurpg/setup-scala@v13
       - run: sbt ci-release
         env:
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
