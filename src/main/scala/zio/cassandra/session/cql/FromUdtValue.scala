@@ -1,8 +1,7 @@
 package zio.cassandra.session.cql
 
-import com.datastax.oss.driver.api.core.cql.Row
-import com.datastax.oss.driver.api.core.data.UdtValue
-import zio.cassandra.session.cql.FromUdtValue.{ make, makeWithFieldName }
+import com.datastax.oss.driver.api.core.data.{GettableByIndex, UdtValue}
+import zio.cassandra.session.cql.FromUdtValue.{make, makeWithFieldName}
 
 import scala.annotation.nowarn
 
@@ -22,7 +21,7 @@ trait FromUdtValue[Scala] { self =>
 object FromUdtValue extends LowerPriorityFromUdtValue with LowestPriorityFromUdtValue {
   trait Object[A] extends FromUdtValue[A]
 
-  def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = (row: Row, index: Int) => {
+  def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = (row: GettableByIndex, index: Int) => {
     val udtValue = row.getUdtValue(index)
     ev.convert(FieldName.Unused, udtValue)
   }

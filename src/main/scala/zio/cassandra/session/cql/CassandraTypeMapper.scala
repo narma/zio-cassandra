@@ -1,8 +1,8 @@
 package zio.cassandra.session.cql
 
-import com.datastax.oss.driver.api.core.`type`.{ DataType, UserDefinedType }
+import com.datastax.oss.driver.api.core.`type`.{DataType, UserDefinedType}
 import com.datastax.oss.driver.api.core.data.UdtValue
-import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
+import com.datastax.oss.driver.internal.core.`type`.{DefaultListType, DefaultMapType, DefaultSetType}
 import shapeless.Lazy
 
 import java.nio.ByteBuffer
@@ -22,7 +22,8 @@ trait CassandraTypeMapper[Scala] {
   def toCassandra(in: Scala, dataType: DataType): Cassandra
   def fromCassandra(in: Cassandra, dataType: DataType): Scala
 }
-object CassandraTypeMapper       {
+
+object CassandraTypeMapper {
   type WithCassandra[Sc, Cas] = CassandraTypeMapper[Sc] { type Cassandra = Cas }
 
   def apply[A](implicit ev: CassandraTypeMapper[A]): CassandraTypeMapper[A] = ev

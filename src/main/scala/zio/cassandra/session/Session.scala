@@ -41,8 +41,9 @@ object Session {
     override def prepare(stmt: String): Task[PreparedStatement] =
       Task.fromCompletionStage(underlying.prepareAsync(stmt))
 
-    override def execute(stmt: Statement[_]): Task[AsyncResultSet] =
+    override def execute(stmt: Statement[_]): Task[AsyncResultSet] = {
       Task.fromCompletionStage(underlying.executeAsync(stmt))
+    }
 
     override def execute(query: String): Task[AsyncResultSet] =
       Task.fromCompletionStage(underlying.executeAsync(query))

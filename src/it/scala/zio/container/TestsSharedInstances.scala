@@ -5,7 +5,6 @@ import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader
 import com.dimafeng.testcontainers.CassandraContainer
 import com.typesafe.config.ConfigFactory
-import org.testcontainers.utility.DockerImageName
 import zio._
 import zio.blocking.Blocking
 import zio.cassandra.session.Session
@@ -18,7 +17,6 @@ import scala.jdk.CollectionConverters.IterableHasAsJava
 trait TestsSharedInstances { self: AbstractRunnableSpec =>
 
   val keyspace  = "tests"
-  val container = CassandraContainer(DockerImageName.parse("cassandra:3.11.11"))
 
   def migrateSession(session: Session): RIO[Blocking, Unit] = {
     val migrations = Stream
@@ -35,7 +33,6 @@ trait TestsSharedInstances { self: AbstractRunnableSpec =>
 
     for {
       _          <- ZIO.debug("start migrations")
-      _          <- session.execute(s"use $keyspace")
       migrations <- migrations
 
       _ <- ZIO.foreach_(migrations) { migration =>
