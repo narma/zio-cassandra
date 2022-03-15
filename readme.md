@@ -2,10 +2,10 @@
 
 [![Release Artifacts][Badge-SonatypeReleases]][Link-SonatypeReleases] [![Snapshot Artifacts][Badge-SonatypeSnapshots]][Link-SonatypeSnapshots]
 
-[Link-SonatypeReleases]: https://oss.sonatype.org/content/repositories/releases/io/github/jsfwa/zio-cassandra_2.13/ "Sonatype Releases"
-[Link-SonatypeSnapshots]: https://oss.sonatype.org/content/repositories/snapshots/io/github/jsfwa/zio-cassandra_2.13/ "Sonatype Snapshots"
-[Badge-SonatypeReleases]: https://img.shields.io/nexus/r/https/oss.sonatype.org/io.github.jsfwa/zio-cassandra_2.13.svg "Sonatype Releases"
-[Badge-SonatypeSnapshots]: https://img.shields.io/nexus/s/https/oss.sonatype.org/io.github.jsfwa/zio-cassandra_2.13.svg "Sonatype Snapshots"
+[Link-SonatypeReleases]: https://oss.sonatype.org/content/repositories/releases/st/alzo/zio-cassandra_2.13/ "Sonatype Releases"
+[Link-SonatypeSnapshots]: https://oss.sonatype.org/content/repositories/snapshots/st/alzo/zio-cassandra_2.13/ "Sonatype Snapshots"
+[Badge-SonatypeReleases]: https://img.shields.io/nexus/r/https/oss.sonatype.org/st.alzo/zio-cassandra_2.13.svg "Sonatype Releases"
+[Badge-SonatypeSnapshots]: https://img.shields.io/nexus/s/https/oss.sonatype.org/st.alzo/zio-cassandra_2.13.svg "Sonatype Snapshots"
 
 This is lightweight ZIO wrapper for latest datastax 4.x driver.
 
