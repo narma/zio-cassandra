@@ -1,5 +1,6 @@
 package zio.cassandra.session.cql
 
+import com.datastax.oss.driver.api.core.cql.Row
 import com.datastax.oss.driver.api.core.data.{ GettableByIndex, UdtValue }
 import zio.cassandra.session.cql.FromUdtValue.{ make, makeWithFieldName }
 
@@ -23,7 +24,16 @@ object FromUdtValue extends LowerPriorityFromUdtValue with LowestPriorityFromUdt
 
   def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = (row: GettableByIndex, index: Int) => {
     val udtValue = row.getUdtValue(index)
-    ev.convert(FieldName.Unused, udtValue)
+    try ev.convert(FieldName.Unused, udtValue)
+    catch {
+      case UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName) =>
+        throw new UnexpectedNullValueInUdt(
+          row.asInstanceOf[Row],
+          index,
+          udtValue,
+          fieldName
+        ) // FIXME: get rid of .asInstanceOf
+    }
   }
 
   // only allowed to summon fully built out FromUdtValue instances which are built by Shapeless machinery
@@ -71,7 +81,12 @@ trait LowerPriorityFromUdtValue {
     ev: CassandraTypeMapper[A]
   ): FromUdtValue[A] =
     makeWithFieldName[A] { (fieldName, udtValue) =>
-      ev.fromCassandra(udtValue.get(fieldName, ev.classType), udtValue.getType(fieldName))
+      if (udtValue.isNull(fieldName)) {
+        if (ev.allowNullable)
+          None.asInstanceOf[A]
+        else throw UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName)
+      } else
+        ev.fromCassandra(udtValue.get(fieldName, ev.classType), udtValue.getType(fieldName))
     }
 }
 

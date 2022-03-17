@@ -4,12 +4,12 @@ import com.datastax.oss.driver.api.core.ConsistencyLevel
 import zio.cassandra.session.Session
 import zio.duration._
 import zio.stream.Stream
-import zio.test.Assertion.{isLeft, isSubtype}
+import zio.test.Assertion.{ isLeft, isSubtype }
 import zio.test.TestAspect.ignore
 import zio.test._
-import zio.{Chunk, Task, ZIO}
+import zio.{ Chunk, Task, ZIO }
 
-import java.time.{LocalDate, LocalTime}
+import java.time.{ LocalDate, LocalTime }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -321,16 +321,28 @@ object CqlSpec {
       } yield assertTrue(result.isDefined && result.get == data)
     },
     suite("handle NULL values")(
-      testM("return None if a type is Option") {
+      testM("return None for Option[String") {
         for {
           session <- ZIO.service[Session]
           result  <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst(session)
         } yield assertTrue(result.isDefined && result.get.isEmpty)
       },
-      testM("raise error if a type is not an Option") {
+      testM("raise error for String(nin-primitive)") {
         for {
           session <- ZIO.service[Session]
           result  <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst(session).either
+        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      },
+      testM("raise error for Int(primitive)") {
+        for {
+          session <- ZIO.service[Session]
+          result  <- cql"select count FROM tests.test_data WHERE id = 0".as[Int].selectFirst(session).either
+        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      },
+      testM("raise error for Set(collection)") {
+        for {
+          session <- ZIO.service[Session]
+          result  <- cql"select dataset FROM tests.test_data WHERE id = 0".as[Set[Int]].selectFirst(session).either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
       testM("return value for field in case class have Option type") {
@@ -372,10 +384,10 @@ object CqlSpec {
                          .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
-        testM("return None when inner value is null for optional type") {
+        testM("return None when udt field value is null for optional type") {
           val data = PersonOptAttribute(
             personAttributeIdxCounter.incrementAndGet(),
-            OptBasicInfo(Some(160.0), None, Some(Set(1)))
+            OptBasicInfo(None, None, None)
           )
 
           for {
@@ -387,21 +399,7 @@ object CqlSpec {
                          .selectFirst(session)
           } yield assertTrue(result.contains(data))
         },
-        testM("return None when inner set is null") {
-          val data =
-            PersonOptAttribute(personAttributeIdxCounter.incrementAndGet(), OptBasicInfo(Some(160.0), None, None))
-
-          for {
-            session <- ZIO.service[Session]
-            _       <-
-              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, {weight:160.0,height:NULL,datapoints:NULL})"
-                .execute(session)
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonOptAttribute]
-                         .selectFirst(session)
-          } yield assertTrue(result.contains(data))
-        } @@ ignore, // todo: why datapoints which is frozen<set<int>> returns as Some(Set()) here?
-        testM("raise error when inner non-optional value is null for non-optional type") {
+        testM("raise error if udt field value is mapped to String(non-primitive)") {
           val data =
             PersonOptAttribute(
               personAttributeIdxCounter.incrementAndGet(),
@@ -410,14 +408,51 @@ object CqlSpec {
 
           for {
             session <- ZIO.service[Session]
-            _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute(session)
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                .execute(session)
             result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                          .as[PersonAttribute]
                          .selectFirst(session)
                          .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
-        } @@ ignore  // fixme
+        },
+        testM("raise error if udt field value is mapped to Double(primitive)") {
+          val data =
+            PersonOptAttribute(
+              personAttributeIdxCounter.incrementAndGet(),
+              OptBasicInfo(None, Some("tall"), Some(Set(1)))
+            )
+
+          for {
+            session <- ZIO.service[Session]
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                .execute(session)
+            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                         .as[PersonAttribute]
+                         .selectFirst(session)
+                         .either
+          } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+        },
+        testM("raise error if udt field value is mapped to Double(primitive)") {
+          val data =
+            PersonOptAttribute(
+              personAttributeIdxCounter.incrementAndGet(),
+              OptBasicInfo(Some(160.0), Some("tall"), None)
+            )
+
+          for {
+            session <- ZIO.service[Session]
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                .execute(session)
+            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                         .as[PersonAttribute]
+                         .selectFirst(session)
+                         .either
+          } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+        }
       )
     )
   )

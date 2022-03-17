@@ -17,7 +17,7 @@ trait Reads[T] { self =>
 
   def read(row: GettableByIndex, index: Int): Task[T] =
     if (row.isNull(index)) {
-      Task.fail(new UnexpectedNullValue(row, index))
+      Task.fail(UnexpectedNullValueInColumn(row.asInstanceOf[Row], index))
     } else {
       Task(readUnsafe(row, index))
     }
@@ -26,22 +26,6 @@ trait Reads[T] { self =>
 
   def map[U](f: T => U): Reads[U] =
     (row: GettableByIndex, index: Int) => f(self.readUnsafe(row, index))
-}
-
-class UnexpectedNullValue(row: GettableByIndex, index: Int) extends RuntimeException() {
-  override def getMessage: String =
-    row match {
-      case row: Row =>
-        val cl       = row.getColumnDefinitions.get(index)
-        val table    = cl.getTable.toString
-        val column   = cl.getName.toString
-        val keyspace = cl.getKeyspace.toString
-        val tpe      = cl.getType.asCql(true, true)
-
-        s"Read NULL value from column $column with type $tpe at $keyspace.$table. Row ${row.getFormattedContents}"
-      case _ =>
-        s"Read NULL value from column at index $index"
-    }
 }
 
 object Reads extends ReadsLowerPriority with ReadsLowestPriority {
@@ -148,7 +132,7 @@ trait ReadsLowestPriority {
 
     override def read(row: GettableByIndex, index: Int): Task[A] =
       if (row.isNull(index)) {
-        Task.fail(new UnexpectedNullValue(row, index))
+        Task.fail(UnexpectedNullValueInColumn(row.asInstanceOf[Row], index))
       } else {
         val tpe = row.getType(index)
         if (tpe.isInstanceOf[UserDefinedType]) {
