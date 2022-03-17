@@ -21,6 +21,7 @@ trait CassandraTypeMapper[Scala] {
   def classType: Class[Cassandra]
   def toCassandra(in: Scala, dataType: DataType): Cassandra
   def fromCassandra(in: Cassandra, dataType: DataType): Scala
+  def allowNullable: Boolean = false
 }
 
 object CassandraTypeMapper {
@@ -246,5 +247,7 @@ object CassandraTypeMapper {
 
       override def fromCassandra(in: Cassandra, dataType: DataType): Option[A] =
         Option(in).map(ev.fromCassandra(_, dataType))
+
+      override def allowNullable: Boolean = true
     }
 }

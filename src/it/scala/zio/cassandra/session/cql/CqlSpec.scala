@@ -7,7 +7,7 @@ import zio.stream.Stream
 import zio.test.Assertion.{isLeft, isSubtype}
 import zio.test.TestAspect.ignore
 import zio.test._
-import zio.{Chunk, Task, ZIO}
+import zio.{Chunk, Has, RIO, ZIO}
 
 import java.time.{LocalDate, LocalTime}
 import java.util.UUID
@@ -77,22 +77,20 @@ object CqlSpec {
   val cqlSuite = suite("cql suite")(
     testM("interpolated select template should return data from migration") {
       for {
-        session  <- ZIO.service[Session]
         prepared <- cqlt"select data FROM tests.test_data WHERE id in ${Put[List[Long]]}"
                       .as[String]
                       .config(_.setTimeout(1.seconds))
-                      .prepare(session)
+                      .prepare
         query     = prepared(List[Long](1, 2, 3))
         results  <- query.select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
     testM("interpolated select template should return tuples from migration with multiple binding") {
       for {
-        session <- ZIO.service[Session]
         query   <-
           cqlt"select data FROM tests.test_data_multiple_keys WHERE id1 = ${Put[Long]} and id2 = ${Put[Int]}"
             .as[String]
-            .prepare(session)
+            .prepare
         results <- query(1L, 2).config(_.setExecutionProfileName("default")).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
@@ -100,25 +98,22 @@ object CqlSpec {
       "interpolated select template should return tuples from migration with multiple binding and margin stripped"
     ) {
       for {
-        session <- ZIO.service[Session]
         query   <- cqlt"""select data FROM tests.test_data_multiple_keys
-                       |WHERE id1 = ${Put[Long]} and id2 = ${Put[Int]}""".stripMargin.as[String].prepare(session)
+                       |WHERE id1 = ${Put[Long]} and id2 = ${Put[Int]}""".stripMargin.as[String].prepare
         results <- query(1L, 2).config(_.setExecutionProfileName("default")).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
     testM("interpolated select template should return data case class from migration") {
       for {
-        session  <- ZIO.service[Session]
         prepared <-
-          cqlt"select id, data FROM tests.test_data WHERE id in ${Put[List[Long]]}".as[Data].prepare(session)
+          cqlt"select id, data FROM tests.test_data WHERE id in ${Put[List[Long]]}".as[Data].prepare
         query     = prepared(List[Long](1, 2, 3))
         results  <- query.select.runCollect
       } yield assertTrue(results == Chunk(Data(1, "one"), Data(2, "two"), Data(3, "three")))
     },
     testM("interpolated select template should be reusable") {
       for {
-        session <- ZIO.service[Session]
-        query   <- cqlt"select data FROM tests.test_data WHERE id = ${Put[Long]}".as[String].prepare(session)
+        query   <- cqlt"select data FROM tests.test_data WHERE id = ${Put[Long]}".as[String].prepare
         result  <- Stream.fromIterable(Seq(1L, 2L, 3L)).flatMap(i => query(i).select).runCollect
       } yield assertTrue(result == Chunk("one", "two", "three"))
     },
@@ -128,24 +123,21 @@ object CqlSpec {
           .as[String]
           .config(_.setConsistencyLevel(ConsistencyLevel.ALL))
       for {
-        session <- ZIO.service[Session]
-        results <- getDataByIds(List(1, 2, 3)).select(session).runCollect
+        results <- getDataByIds(List(1, 2, 3)).select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
     testM("interpolated select should return tuples from migration") {
       def getAllByIds(ids: List[Long]) =
         cql"select id, data FROM tests.test_data WHERE id in $ids".as[(Long, String)]
       for {
-        session <- ZIO.service[Session]
-        results <- getAllByIds(List(1, 2, 3)).config(_.setQueryTimestamp(0L)).select(session).runCollect
+        results <- getAllByIds(List(1, 2, 3)).config(_.setQueryTimestamp(0L)).select.runCollect
       } yield assertTrue(results == Chunk((1L, "one"), (2L, "two"), (3L, "three")))
     },
     testM("interpolated select should return tuples from migration with multiple binding") {
       def getAllByIds(id1: Long, id2: Int) =
         cql"select data FROM tests.test_data_multiple_keys WHERE id1 = $id1 and id2 = $id2".as[String]
       for {
-        session <- ZIO.service[Session]
-        results <- getAllByIds(1, 2).select(session).runCollect
+        results <- getAllByIds(1, 2).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
     testM("interpolated select should return tuples from migration with multiple binding and margin stripped") {
@@ -153,16 +145,14 @@ object CqlSpec {
         cql"""select data FROM tests.test_data_multiple_keys
              |WHERE id1 = $id1 and id2 = $id2""".stripMargin.as[String]
       for {
-        session <- ZIO.service[Session]
-        results <- getAllByIds(1, 2).select(session).runCollect
+        results <- getAllByIds(1, 2).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
     testM("interpolated select should return data case class from migration") {
       def getIds(ids: List[Long]) =
         cql"select id, data FROM tests.test_data WHERE id in $ids".as[Data]
       for {
-        session <- ZIO.service[Session]
-        results <- getIds(List(1, 2, 3)).select(session).runCollect
+        results <- getIds(List(1, 2, 3)).select.runCollect
       } yield assertTrue(results == Chunk(Data(1, "one"), Data(2, "two"), Data(3, "three")))
     },
     testM(
@@ -172,12 +162,11 @@ object CqlSpec {
         PersonAttribute(personAttributeIdxCounter.incrementAndGet(), BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
 
       for {
-        session <- ZIO.service[Session]
         _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                     .execute(session)
+                     .execute
         result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                      .as[PersonAttribute]
-                     .select(session)
+                     .select
                      .runCollect
       } yield assertTrue(result.length == 1 && result.head == data)
     },
@@ -185,23 +174,22 @@ object CqlSpec {
       val dataRow1 = CollectionTestRow(1, Map("2" -> UUID.randomUUID()), Set(1, 2, 3), Option(List(LocalDate.now())))
       val dataRow2 = CollectionTestRow(2, Map("3" -> UUID.randomUUID()), Set(4, 5, 6), None)
 
-      def insert(session: Session)(data: CollectionTestRow): Task[Boolean] =
+      def insert(data: CollectionTestRow): RIO[Has[Session], Boolean] =
         cql"INSERT INTO tests.test_collection (id, maptest, settest, listtest) VALUES (${data.id}, ${data.maptest}, ${data.settest}, ${data.listtest})"
-          .execute(session)
+          .execute
 
-      def retrieve(session: Session, id: Int, ids: Int*): Task[Chunk[CollectionTestRow]] = {
+      def retrieve(id: Int, ids: Int*): RIO[Has[Session], Chunk[CollectionTestRow]] = {
         val allIds = id :: ids.toList
         cql"SELECT id, maptest, settest, listtest FROM tests.test_collection WHERE id IN $allIds"
           .as[CollectionTestRow]
-          .select(session)
+          .select
           .runCollect
       }
 
       for {
-        session <- ZIO.service[Session]
-        _       <- ZIO.foreachPar_(List(dataRow1, dataRow2))(insert(session))
-        res1    <- retrieve(session, dataRow1.id)
-        res2    <- retrieve(session, dataRow2.id)
+        _       <- ZIO.foreachPar_(List(dataRow1, dataRow2))(insert)
+        res1    <- retrieve(dataRow1.id)
+        res2    <- retrieve(dataRow2.id)
       } yield assertTrue(res1.length == 1 && res1.head == dataRow1) && assertTrue(
         res2.length == 1 && res2.head == dataRow2
       )
@@ -256,11 +244,10 @@ object CqlSpec {
       )
 
       for {
-        session <- ZIO.service[Session]
-        _       <- cql"INSERT INTO tests.heavily_nested_udt_table (id, data) VALUES (${row.id}, ${row.data})".execute(session)
+        _       <- cql"INSERT INTO tests.heavily_nested_udt_table (id, data) VALUES (${row.id}, ${row.data})".execute
         actual  <- cql"SELECT id, data FROM tests.heavily_nested_udt_table WHERE id = ${row.id}"
                      .as[TableContainingExampleCollectionNestedUdtType]
-                     .select(session)
+                     .select
                      .runCollect
       } yield assertTrue(actual.length == 1 && actual.head == row)
     },
@@ -275,27 +262,23 @@ object CqlSpec {
           )
         )
       )
-      def insert(session: Session) =
-        cql"INSERT INTO tests.heavily_nested_prim_table (id, data) VALUES (${row.id}, ${row.data})".execute(
-          session
-        )
+      def insert =
+        cql"INSERT INTO tests.heavily_nested_prim_table (id, data) VALUES (${row.id}, ${row.data})".execute
 
-      def retrieve(session: Session) = cql"SELECT id, data FROM tests.heavily_nested_prim_table WHERE id = ${row.id}"
+      def retrieve = cql"SELECT id, data FROM tests.heavily_nested_prim_table WHERE id = ${row.id}"
         .as[TableContainingExampleNestedPrimitiveType]
-        .select(session)
+        .select
         .runCollect
 
       for {
-        session <- ZIO.service[Session]
-        _       <- insert(session)
-        actual  <- retrieve(session)
+        _       <- insert
+        actual  <- retrieve
       } yield assertTrue(actual.length == 1 && actual.head == row)
     },
     testM("interpolated select should bind constants") {
       val query = cql"select data FROM tests.test_data WHERE id = ${1L}".as[String]
       for {
-        session <- ZIO.service[Session]
-        result  <- query.select(session).runCollect
+        result  <- query.select.runCollect
       } yield assertTrue(result == Chunk("one"))
     },
     testM("cqlConst allows you to interpolate on what is usually not possible with cql strings") {
@@ -310,39 +293,44 @@ object CqlSpec {
       def where(personId: Int) =
         cql" WHERE person_id = $personId"
 
-      def insert(session: Session, data: PersonAttribute) =
+      def insert(data: PersonAttribute) =
         (cql"INSERT INTO " ++ keyspace ++ table ++ cql" (person_id, info) VALUES (${data.personId}, ${data.info})")
-          .execute(session)
+          .execute
 
       for {
-        session <- ZIO.service[Session]
-        _       <- insert(session, data)
-        result  <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst(session)
+        _       <- insert(data)
+        result  <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst
       } yield assertTrue(result.isDefined && result.get == data)
     },
     suite("handle NULL values")(
-      testM("return None if a type is Option") {
+      testM("return None for Option[String") {
         for {
-          session <- ZIO.service[Session]
-          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst(session)
+          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst
         } yield assertTrue(result.isDefined && result.get.isEmpty)
       },
-      testM("raise error if a type is not an Option") {
+      testM("raise error for String(nin-primitive)") {
         for {
-          session <- ZIO.service[Session]
-          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst(session).either
+          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst.either
+        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      },
+      testM("raise error for Int(primitive)") {
+        for {
+          result  <- cql"select count FROM tests.test_data WHERE id = 0".as[Int].selectFirst.either
+        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      },
+      testM("raise error for Set(collection)") {
+        for {
+          result  <- cql"select dataset FROM tests.test_data WHERE id = 0".as[Set[Int]].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
       testM("return value for field in case class have Option type") {
         for {
-          session <- ZIO.service[Session]
-          row     <- cql"select id, data FROM tests.test_data WHERE id = 0".as[OptData].selectFirst(session)
+          row     <- cql"select id, data FROM tests.test_data WHERE id = 0".as[OptData].selectFirst
         } yield assertTrue(row.isDefined && row.get.data.isEmpty)
       },
       testM("raise error if field in case class have Option type") {
         for {
-          session <- ZIO.service[Session]
-          result  <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst(session).either
+          result  <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
       suite("handle NULL values with udt")(
@@ -350,12 +338,11 @@ object CqlSpec {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
 
           for {
-            session <- ZIO.service[Session]
             _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute(session)
+                         .execute
             result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                          .as[OptPersonAttribute]
-                         .select(session)
+                         .select
                          .runCollect
           } yield assertTrue(result.length == 1 && result.head == data)
         },
@@ -363,45 +350,29 @@ object CqlSpec {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
 
           for {
-            session <- ZIO.service[Session]
             _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute(session)
+                         .execute
             result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                          .as[PersonAttribute]
-                         .selectFirst(session)
+                         .selectFirst
                          .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
-        testM("return None when inner value is null for optional type") {
+        testM("return None when udt field value is null for optional type") {
           val data = PersonOptAttribute(
             personAttributeIdxCounter.incrementAndGet(),
-            OptBasicInfo(Some(160.0), None, Some(Set(1)))
+            OptBasicInfo(None, None, None)
           )
 
           for {
-            session <- ZIO.service[Session]
             _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute(session)
+                         .execute
             result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                          .as[PersonOptAttribute]
-                         .selectFirst(session)
+                         .selectFirst
           } yield assertTrue(result.contains(data))
         },
-        testM("return None when inner set is null") {
-          val data =
-            PersonOptAttribute(personAttributeIdxCounter.incrementAndGet(), OptBasicInfo(Some(160.0), None, None))
-
-          for {
-            session <- ZIO.service[Session]
-            _       <-
-              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, {weight:160.0,height:NULL,datapoints:NULL})"
-                .execute(session)
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonOptAttribute]
-                         .selectFirst(session)
-          } yield assertTrue(result.contains(data))
-        } @@ ignore, // todo: why datapoints which is frozen<set<int>> returns as Some(Set()) here?
-        testM("raise error when inner non-optional value is null for non-optional type") {
+        testM("raise error if udt field value is mapped to String(non-primitive)") {
           val data =
             PersonOptAttribute(
               personAttributeIdxCounter.incrementAndGet(),
@@ -409,15 +380,49 @@ object CqlSpec {
             )
 
           for {
-            session <- ZIO.service[Session]
-            _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute(session)
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                .execute
             result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
                          .as[PersonAttribute]
-                         .selectFirst(session)
+                         .selectFirst
                          .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
-        } @@ ignore  // fixme
+        },
+        testM("raise error if udt field value is mapped to Double(primitive)") {
+          val data =
+            PersonOptAttribute(
+              personAttributeIdxCounter.incrementAndGet(),
+              OptBasicInfo(None, Some("tall"), Some(Set(1)))
+            )
+
+          for {
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                .execute
+            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                         .as[PersonAttribute]
+                         .selectFirst
+                         .either
+          } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+        },
+        testM("raise error if udt field value is mapped to Double(primitive)") {
+          val data =
+            PersonOptAttribute(
+              personAttributeIdxCounter.incrementAndGet(),
+              OptBasicInfo(Some(160.0), Some("tall"), None)
+            )
+
+          for {
+            _       <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                .execute
+            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                         .as[PersonAttribute]
+                         .selectFirst
+                         .either
+          } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+        }
       )
     )
   )

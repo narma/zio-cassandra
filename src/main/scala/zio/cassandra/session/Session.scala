@@ -93,6 +93,11 @@ object Session {
     override def keyspace: Option[CqlIdentifier] = underlying.getKeyspace.toScala
   }
 
+  def live: ZManaged[Has[CqlSessionBuilder], Throwable, Session] =
+    ZManaged.serviceWithManaged[CqlSessionBuilder] { cqlSessionBuilder =>
+      make(cqlSessionBuilder)
+    }
+
   def make(builder: => CqlSessionBuilder): TaskManaged[Session] =
     ZManaged
       .make(Task.fromCompletionStage(builder.buildAsync())) { session =>
