@@ -11,13 +11,16 @@ class Query[R: Reads] private[cql] (
   private[cql] val statement: BoundStatement
 ) {
   def config(statement: BoundStatement => BoundStatement) = new Query[R](session, statement(this.statement))
+
   def select: Stream[Throwable, R]                        = session.select(statement).mapChunksM { chunk =>
     chunk.mapM(Reads[R].read(_, 0))
   }
+
   def selectFirst: Task[Option[R]]                        = session.selectFirst(statement).flatMap {
     case None      => ZIO.none
     case Some(row) =>
       Reads[R].read(row, 0).map(Some(_))
   }
+
   def execute: Task[Boolean]                              = session.execute(statement).map(_.wasApplied)
 }
