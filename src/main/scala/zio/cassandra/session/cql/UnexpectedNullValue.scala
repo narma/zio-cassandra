@@ -1,15 +1,16 @@
 package zio.cassandra.session.cql
 
-import com.datastax.oss.driver.api.core.cql.Row
+import com.datastax.oss.driver.api.core.cql.{ ColumnDefinition, Row }
 import com.datastax.oss.driver.api.core.data.UdtValue
 
 import scala.util.control.NoStackTrace
 
 sealed trait UnexpectedNullValue extends Throwable
 
-case class UnexpectedNullValueInColumn(row: Row, index: Int) extends RuntimeException() with UnexpectedNullValue {
+case class UnexpectedNullValueInColumn(row: Row, cl: ColumnDefinition)
+    extends RuntimeException()
+    with UnexpectedNullValue {
   override def getMessage: String = {
-    val cl       = row.getColumnDefinitions.get(index)
     val table    = cl.getTable.toString
     val column   = cl.getName.toString
     val keyspace = cl.getKeyspace.toString
@@ -19,11 +20,21 @@ case class UnexpectedNullValueInColumn(row: Row, index: Int) extends RuntimeExce
   }
 }
 
-case class UnexpectedNullValueInUdt(row: Row, index: Int, udt: UdtValue, fieldName: String)
-  extends RuntimeException()
+object UnexpectedNullValueInColumn {
+
+  def apply(row: Row, fieldName: String): UnexpectedNullValueInColumn =
+    UnexpectedNullValueInColumn(row, row.getColumnDefinitions.get(fieldName))
+
+  def apply(row: Row, index: Int): UnexpectedNullValueInColumn =
+    UnexpectedNullValueInColumn(row, row.getColumnDefinitions.get(index))
+
+}
+
+case class UnexpectedNullValueInUdt(row: Row, udt: UdtValue, fieldName: String)
+    extends RuntimeException()
     with UnexpectedNullValue {
   override def getMessage: String = {
-    val cl       = row.getColumnDefinitions.get(index)
+    val cl       = row.getColumnDefinitions.get(fieldName)
     val table    = cl.getTable.toString
     val column   = cl.getName.toString
     val keyspace = cl.getKeyspace.toString
@@ -39,4 +50,3 @@ case class UnexpectedNullValueInUdt(row: Row, index: Int, udt: UdtValue, fieldNa
 object UnexpectedNullValueInUdt {
   private[cql] case class NullValueInUdt(udtValue: UdtValue, fieldName: String) extends NoStackTrace
 }
-

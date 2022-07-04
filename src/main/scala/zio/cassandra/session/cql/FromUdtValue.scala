@@ -22,18 +22,20 @@ trait FromUdtValue[Scala] { self =>
 object FromUdtValue extends LowerPriorityFromUdtValue with LowestPriorityFromUdtValue {
   trait Object[A] extends FromUdtValue[A]
 
-  def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = (row: GettableByIndex, index: Int) => {
-    val udtValue = row.getUdtValue(index)
-    try ev.convert(FieldName.Unused, udtValue)
-    catch {
-      case UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName) =>
-        throw new UnexpectedNullValueInUdt(
-          row.asInstanceOf[Row],
-          index,
-          udtValue,
-          fieldName
-        ) // FIXME: get rid of .asInstanceOf
+  def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = {
+    val _ = (row: GettableByIndex, index: Int) => {
+      val udtValue = row.getUdtValue(index)
+      try ev.convert(FieldName.Unused, udtValue)
+      catch {
+        case UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName) =>
+          throw new UnexpectedNullValueInUdt(
+            row.asInstanceOf[Row],
+            udtValue,
+            fieldName
+          ) // FIXME: get rid of .asInstanceOf
+      }
     }
+    ??? // fixme derive Reads from UdtReads?
   }
 
   // only allowed to summon fully built out FromUdtValue instances which are built by Shapeless machinery

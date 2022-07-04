@@ -74,3 +74,51 @@ CREATE TABLE tests.heavily_nested_prim_table(
                                           data example_nested_primitive_type,
                                           PRIMARY KEY (id)
 );
+
+create table tests.reads_type_test(
+                                id bigint,
+                                data text,
+                                count int,
+                                flag boolean,
+                                dataset frozen<set<int>>,
+                                datalist list<int>,
+                                datamap map<int, text>,
+                                PRIMARY KEY (id)
+);
+
+insert into tests.reads_type_test (id, data, count, flag, dataset, datalist, datamap)
+  values (0, 'zero', null, null, null, null, null);
+
+insert into tests.reads_type_test (id, data, count, flag, dataset, datalist, datamap)
+  values (1, 'one', null, null, {}, [], {});
+
+insert into tests.reads_type_test (id, data, count, flag, dataset, datalist, datamap)
+  values (2, 'two', 20, false, {200}, [210], {220: '2_zero'});
+
+insert into tests.reads_type_test (id, data, count, flag, dataset, datalist, datamap)
+  values (3, 'three', 30, true, {300, 301, 302}, [310, 311, 312], {320: '3_zero', 321: '3_one'});
+
+insert into tests.reads_type_test (id, data)
+  values (4, 'four');
+
+create table tests.reads_default_name_test(
+                                            id bigint,
+                                            allupper text,
+                                            alllower text,
+                                            someName text,
+                                            someLongName text,
+                                            PRIMARY KEY (id)
+);
+
+insert into tests.reads_default_name_test (id, allupper, alllower, someName, someLongName) values (0, 'ALL-UPPER', 'all-lower', 'some-name', 'some-long-name');
+
+create table tests.reads_snake_name_test(
+                                id bigint,
+                                allupper text,
+                                alllower text,
+                                some_name text,
+                                some_long_name text,
+                                PRIMARY KEY (id)
+);
+
+insert into tests.reads_snake_name_test (id, allupper, alllower, some_name, some_long_name) values (0, 'ALL-UPPER', 'all-lower', 'some-name', 'some-long-name');
