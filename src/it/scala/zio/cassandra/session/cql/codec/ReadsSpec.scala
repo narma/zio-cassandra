@@ -1,16 +1,11 @@
-package zio.cassandra.session.cql
+package zio.cassandra.session.cql.codec
 
-import com.datastax.oss.driver.api.core.cql.{ Row, SimpleStatement }
-import zio.cassandra.session.Session
-import zio.test._
-import zio.test.Assertion._
-import zio._
+import zio.cassandra.session.{ CassandraSpecUtils, Session }
+import zio.test.Assertion.hasSameElements
+import zio.test.{ assert, assertTrue, suite, testM }
+import zio.{ Chunk, ZIO }
 
-object ReadsSpec {
-
-  private val keyspace = "tests"
-
-  implicit def toStatement(s: String): SimpleStatement = SimpleStatement.newInstance(s)
+object ReadsSpec extends CassandraSpecUtils {
 
   final case class TypeTestData(
     id: BigInt,
@@ -18,10 +13,13 @@ object ReadsSpec {
     count: Option[Int],
     flag: Option[Boolean],
     dataset: Option[Set[Int]],
-    datalist: List[Int],
-    datamap: Map[Int, String])
+    datalist: Option[List[Int]],
+    datamap: Option[Map[Int, String]]
+  )
 
   final case class NameTestData(id: BigInt, ALLUPPER: String, alllower: String, someName: String, someLongName: String)
+
+  final case class NullableCollectionsTestData(id: Int, regularList: Seq[Int], frozenList: Seq[Int])
 
   private val nameTestData = NameTestData(0, "ALL-UPPER", "all-lower", "some-name", "some-long-name")
 
@@ -29,20 +27,19 @@ object ReadsSpec {
     testM("should read simple data types") {
       val expected =
         Chunk(
-          // cassandra can't differentiate null and List.empty / Map.empty, but can differentiate null and Set.empty
-          TypeTestData(0, "zero", None, None, None, List.empty, Map.empty),
-          TypeTestData(1, "one", None, None, Some(Set.empty), List.empty, Map.empty),
-          TypeTestData(2, "two", Some(20), Some(false), Some(Set(200)), List(210), Map(220 -> "2_zero")),
+          TypeTestData(0, "zero", None, None, None, None, None),
+          TypeTestData(1, "one", None, None, Some(Set.empty), Some(List.empty), Some(Map.empty)),
+          TypeTestData(2, "two", Some(20), Some(false), Some(Set(200)), Some(List(210)), Some(Map(220 -> "2_zero"))),
           TypeTestData(
             3,
             "three",
             Some(30),
             Some(true),
             Some(Set(300, 301, 302)),
-            List(310, 311, 312),
-            Map(320 -> "3_zero", 321 -> "3_one")
+            Some(List(310, 311, 312)),
+            Some(Map(320 -> "3_zero", 321 -> "3_one"))
           ),
-          TypeTestData(4, "four", None, None, None, List.empty, Map.empty)
+          TypeTestData(4, "four", None, None, None, None, None)
         )
 
       for {
@@ -54,6 +51,8 @@ object ReadsSpec {
       } yield assert(result)(hasSameElements(expected))
     },
     testM("should read names as is") {
+      implicit val configuration: Configuration = Configuration(identity)
+
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -64,6 +63,8 @@ object ReadsSpec {
       } yield assertTrue(result.contains(nameTestData))
     },
     testM("should read names as is regardless of order in row") {
+      implicit val configuration: Configuration = Configuration(identity)
+
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -74,8 +75,6 @@ object ReadsSpec {
       } yield assertTrue(result.contains(nameTestData))
     },
     testM("should read names transformed to snake_case") {
-      implicit val configuration: Reads.Configuration = Reads.defaultConfiguration.withSnakeCase
-
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -86,8 +85,6 @@ object ReadsSpec {
       } yield assertTrue(result.contains(nameTestData))
     },
     testM("should read names transformed to snake_case regardless of order in row") {
-      implicit val configuration: Reads.Configuration = Reads.defaultConfiguration.withSnakeCase
-
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -96,13 +93,16 @@ object ReadsSpec {
                      )
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
+    },
+    testM("should read nulls and empty collections to empty collections") {
+      for {
+        session <- ZIO.service[Session]
+        result  <- session
+                     .select(s"select id, regular_list, frozen_list FROM $keyspace.nullable_collection_tests")
+                     .mapM(read[NullableCollectionsTestData](_))
+                     .runCollect
+      } yield assertTrue(result.forall(d => d.regularList.isEmpty && d.frozenList.isEmpty))
     }
   )
-
-  private def read[T: Reads](row: Row): IO[TestFailure[Throwable], T] =
-    Reads[T].read(row).mapError(TestFailure.die)
-
-  private def readOpt[T: Reads](row: Option[Row]): IO[TestFailure[Throwable], Option[T]] =
-    ZIO.foreach(row)(read[T](_))
 
 }

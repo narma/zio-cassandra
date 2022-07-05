@@ -2,8 +2,9 @@ package zio.cassandra.session.cql.query
 
 import com.datastax.oss.driver.api.core.cql.{ BoundStatement, PreparedStatement }
 import shapeless.{ HList, ProductArgs }
-import zio.cassandra.session.cql.{ Binder, Reads }
+import zio.cassandra.session.cql.{ Binder }
 import zio.cassandra.session.Session
+import zio.cassandra.session.cql.codec.Reads
 
 class PreparedQuery[V <: HList: Binder, R: Reads] private[cql] (
   session: Session,

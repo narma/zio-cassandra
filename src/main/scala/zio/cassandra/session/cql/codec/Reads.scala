@@ -1,47 +1,33 @@
-package zio.cassandra.session.cql
+package zio.cassandra.session.cql.codec
 
 import com.datastax.oss.driver.api.core.cql.Row
 import shapeless._
 import shapeless.labelled.{ field, FieldType }
 import zio._
-import zio.cassandra.session.cql.Reads.{ instance, Configuration }
+import zio.cassandra.session.cql.codec.Reads.instance
 
-import java.util.regex.Pattern
 import scala.annotation.nowarn
 
+/** The main typeclass for decoding Cassandra values, the only one that matters. <br>
+  * [[zio.cassandra.session.cql.codec.RawReads]] and [[zio.cassandra.session.cql.codec.UdtReads]] are mostly an
+  * implementation details. As long as you can provide and instance of [[zio.cassandra.session.cql.codec.Reads]] for your
+  * class (regardless of how you've created it), everything should work just fine.
+  */
 trait Reads[T] {
 
   def read(row: Row): Task[T]
 
 }
 
-object Reads extends ReadsInstances with ReadsDerivation with ReadsConfigurationInstances {
+object Reads extends ReadsInstances1 {
 
   def apply[T](implicit reads: Reads[T]): Reads[T] = reads
 
   def instance[T](f: Row => Task[T]): Reads[T] = (row: Row) => f(row)
 
-  final case class Configuration(transformFieldNames: String => String) {
-    def withSnakeCase: Configuration = copy(transformFieldNames = snakeCaseTransformation)
-  }
-
-  implicit val defaultReadsConfiguration: Configuration = defaultConfiguration
-
 }
 
-trait ReadsConversions {
-
-  implicit def readsFromRawReads[T: RawReads]: Reads[T] = instance(readByIndex(_, 0))
-
-  protected def readByIndex[T: RawReads](row: Row, index: Int): Task[T] =
-    RawReads[T].read(row.getBytesUnsafe(index), row.protocolVersion()).mapError {
-      case RawReads.UnexpectedNullError  => UnexpectedNullValueInColumn(row, index)
-      case RawReads.InternalError(cause) => cause
-    }
-
-}
-
-trait ReadsInstances extends ReadsConversions {
+trait ReadsInstances1 extends ReadsInstances2 {
 
   implicit val rowReads: Reads[Row] = instance(ZIO.succeed(_))
 
@@ -66,7 +52,7 @@ trait ReadsInstances extends ReadsConversions {
 
 }
 
-trait ReadsDerivation {
+trait ReadsInstances2 extends ReadsInstances3 {
 
   implicit val hNilReads: Reads[HNil] = instance(_ => ZIO.succeed(HNil))
 
@@ -74,15 +60,15 @@ trait ReadsDerivation {
     configuration: Configuration,
     hReads: RawReads[H],
     tReads: Reads[T],
-    fieldName: Witness.Aux[K]
+    fieldNameW: Witness.Aux[K]
   ): Reads[FieldType[K, H] :: T] =
     instance { row =>
       for {
-        transformedFieldName <- ZIO.succeed(configuration.transformFieldNames(fieldName.value.name))
-        head                 <- hReads
-                                  .read(row.getBytesUnsafe(transformedFieldName), row.protocolVersion())
-                                  .mapError(toThrowable(_, row, transformedFieldName))
-        tail                 <- tReads.read(row)
+        fieldName <- ZIO.succeed(configuration.transformFieldNames(fieldNameW.value.name))
+        head      <- hReads
+                       .read(row.getBytesUnsafe(fieldName), row.protocolVersion(), row.getType(fieldName))
+                       .mapError(toThrowable(_, row, fieldName))
+        tail      <- tReads.read(row)
       } yield field[K](head) :: tail
     }
 
@@ -102,16 +88,14 @@ trait ReadsDerivation {
 
 }
 
-trait ReadsConfigurationInstances {
+trait ReadsInstances3 {
 
-  val defaultConfiguration: Configuration = Configuration(identity)
+  implicit def readsFromRawReads[T: RawReads]: Reads[T] = instance(readByIndex(_, 0))
 
-  private val basePattern: Pattern = Pattern.compile("([A-Z]+)([A-Z][a-z])")
-  private val swapPattern: Pattern = Pattern.compile("([a-z\\d])([A-Z])")
-
-  val snakeCaseTransformation: String => String = s => {
-    val partial = basePattern.matcher(s).replaceAll("$1_$2")
-    swapPattern.matcher(partial).replaceAll("$1_$2").toLowerCase
-  }
+  protected def readByIndex[T: RawReads](row: Row, index: Int): Task[T] =
+    RawReads[T].read(row.getBytesUnsafe(index), row.protocolVersion(), row.getType(index)).mapError {
+      case RawReads.UnexpectedNullError  => UnexpectedNullValueInColumn(row, index)
+      case RawReads.InternalError(cause) => cause
+    }
 
 }

@@ -1,4 +1,4 @@
-package zio.cassandra.session.cql
+package zio.cassandra.session.cql.codec
 
 import com.datastax.oss.driver.api.core.cql.{ ColumnDefinition, Row }
 import com.datastax.oss.driver.api.core.data.UdtValue
@@ -30,19 +30,13 @@ object UnexpectedNullValueInColumn {
 
 }
 
-case class UnexpectedNullValueInUdt(row: Row, udt: UdtValue, fieldName: String)
+case class UnexpectedNullValueInUdt(udt: UdtValue, fieldName: String)
     extends RuntimeException()
     with UnexpectedNullValue {
   override def getMessage: String = {
-    val cl       = row.getColumnDefinitions.get(fieldName)
-    val table    = cl.getTable.toString
-    val column   = cl.getName.toString
-    val keyspace = cl.getKeyspace.toString
-    val tpe      = cl.getType.asCql(true, true)
-
     val udtTpe = udt.getType(fieldName)
 
-    s"Read NULL value from $keyspace.$table inside UDT column $column with type $tpe. NULL value in $fieldName, expected type $udtTpe. Row ${row.getFormattedContents}"
+    s"Read NULL value from UDT. NULL value in $fieldName, expected type $udtTpe. UDTValue ${udt.getFormattedContents}"
   }
 
 }

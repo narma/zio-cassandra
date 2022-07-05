@@ -10,10 +10,7 @@ import zio.{ Chunk, Task, ZIO }
 
 import java.net.InetSocketAddress
 
-object SessionSpec {
-  private val keyspace = "tests"
-
-  implicit def toStatement(s: String): SimpleStatement = SimpleStatement.newInstance(s)
+object SessionSpec extends CassandraSpecUtils {
 
   val sessionTests = suite("Cassandra session")(
     testM("Session.make must be referentially transparent") {

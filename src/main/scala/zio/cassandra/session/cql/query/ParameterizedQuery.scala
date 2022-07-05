@@ -4,7 +4,8 @@ import com.datastax.oss.driver.api.core.cql.BoundStatement
 import shapeless.HList
 import shapeless.ops.hlist.Prepend
 import zio.cassandra.session.Session
-import zio.cassandra.session.cql.{Binder, Reads}
+import zio.cassandra.session.cql.{Binder}
+import zio.cassandra.session.cql.codec.Reads
 import zio.stream.{Stream, ZStream}
 import zio.{Has, RIO}
 

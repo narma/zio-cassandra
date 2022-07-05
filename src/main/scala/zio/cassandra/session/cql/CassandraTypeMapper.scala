@@ -20,8 +20,6 @@ trait CassandraTypeMapper[Scala] {
   type Cassandra
   def classType: Class[Cassandra]
   def toCassandra(in: Scala, dataType: DataType): Cassandra
-  def fromCassandra(in: Cassandra, dataType: DataType): Scala
-  def allowNullable: Boolean = false
 }
 
 object CassandraTypeMapper {
@@ -34,7 +32,6 @@ object CassandraTypeMapper {
       type Cassandra = String
       def classType: Class[Cassandra]                              = classOf[String]
       def toCassandra(in: String, dataType: DataType): Cassandra   = in
-      def fromCassandra(in: Cassandra, dataType: DataType): String = in
     }
 
   implicit val doubleCassandraTypeMapper: CassandraTypeMapper.WithCassandra[Double, java.lang.Double] =
@@ -42,7 +39,6 @@ object CassandraTypeMapper {
       type Cassandra = java.lang.Double
       def classType: Class[Cassandra]                              = classOf[java.lang.Double]
       def toCassandra(in: Double, dataType: DataType): Cassandra   = Double.box(in)
-      def fromCassandra(in: Cassandra, dataType: DataType): Double = in
     }
 
   implicit val intCassandraTypeMapper: CassandraTypeMapper.WithCassandra[Int, java.lang.Integer] =
@@ -50,7 +46,6 @@ object CassandraTypeMapper {
       type Cassandra = java.lang.Integer
       def classType: Class[Cassandra]                           = classOf[java.lang.Integer]
       def toCassandra(in: Int, dataType: DataType): Cassandra   = scala.Int.box(in)
-      def fromCassandra(in: Cassandra, dataType: DataType): Int = in
     }
 
   implicit val longCassandraTypeMapper: CassandraTypeMapper.WithCassandra[Long, java.lang.Long] =
@@ -58,7 +53,6 @@ object CassandraTypeMapper {
       type Cassandra = java.lang.Long
       def classType: Class[Cassandra]                            = classOf[java.lang.Long]
       def toCassandra(in: Long, dataType: DataType): Cassandra   = Long.box(in)
-      def fromCassandra(in: Cassandra, dataType: DataType): Long = in
     }
 
   implicit val byteBufferCassandraTypeMapper: CassandraTypeMapper.WithCassandra[ByteBuffer, ByteBuffer] =
@@ -66,7 +60,6 @@ object CassandraTypeMapper {
       type Cassandra = java.nio.ByteBuffer
       def classType: Class[Cassandra]                                  = classOf[java.nio.ByteBuffer]
       def toCassandra(in: ByteBuffer, dataType: DataType): Cassandra   = in
-      def fromCassandra(in: Cassandra, dataType: DataType): ByteBuffer = in
     }
 
   implicit val localDateCassandraTypeMapper: CassandraTypeMapper.WithCassandra[LocalDate, LocalDate] =
@@ -74,7 +67,6 @@ object CassandraTypeMapper {
       type Cassandra = java.time.LocalDate
       def classType: Class[Cassandra]                                           = classOf[java.time.LocalDate]
       def toCassandra(in: java.time.LocalDate, dataType: DataType): Cassandra   = in
-      def fromCassandra(in: Cassandra, dataType: DataType): java.time.LocalDate = in
     }
 
   implicit val localTimeCassandraTypeMapper
@@ -83,7 +75,6 @@ object CassandraTypeMapper {
       type Cassandra = java.time.LocalTime
       def classType: Class[Cassandra]                                           = classOf[java.time.LocalTime]
       def toCassandra(in: java.time.LocalTime, dataType: DataType): Cassandra   = in
-      def fromCassandra(in: Cassandra, dataType: DataType): java.time.LocalTime = in
     }
 
   implicit val instantCassandraTypeMapper: CassandraTypeMapper.WithCassandra[java.time.Instant, java.time.Instant] =
@@ -91,7 +82,6 @@ object CassandraTypeMapper {
       type Cassandra = java.time.Instant
       def classType: Class[Cassandra]                                         = classOf[java.time.Instant]
       def toCassandra(in: java.time.Instant, dataType: DataType): Cassandra   = in
-      def fromCassandra(in: Cassandra, dataType: DataType): java.time.Instant = in
     }
 
   implicit val boolCassandraTypeMapper: CassandraTypeMapper.WithCassandra[Boolean, java.lang.Boolean] =
@@ -99,7 +89,6 @@ object CassandraTypeMapper {
       type Cassandra = java.lang.Boolean
       def classType: Class[Cassandra]                               = classOf[java.lang.Boolean]
       def toCassandra(in: Boolean, dataType: DataType): Cassandra   = Boolean.box(in)
-      def fromCassandra(in: Cassandra, dataType: DataType): Boolean = in
     }
 
   implicit val uuidCassandraTypeMapper: CassandraTypeMapper.WithCassandra[java.util.UUID, java.util.UUID] =
@@ -107,7 +96,6 @@ object CassandraTypeMapper {
       type Cassandra = java.util.UUID
       def classType: Class[Cassandra]                                      = classOf[java.util.UUID]
       def toCassandra(in: java.util.UUID, dataType: DataType): Cassandra   = in
-      def fromCassandra(in: Cassandra, dataType: DataType): java.util.UUID = in
     }
 
   implicit val shortCassandraTypeMapper: CassandraTypeMapper.WithCassandra[Short, java.lang.Short] =
@@ -115,7 +103,6 @@ object CassandraTypeMapper {
       type Cassandra = java.lang.Short
       def classType: Class[Cassandra]                             = classOf[java.lang.Short]
       def toCassandra(in: Short, dataType: DataType): Cassandra   = scala.Short.box(in)
-      def fromCassandra(in: Cassandra, dataType: DataType): Short = in.shortValue()
     }
 
   implicit val bigDecimalCassandraTypeMapper
@@ -124,7 +111,6 @@ object CassandraTypeMapper {
       type Cassandra = java.math.BigDecimal
       def classType: Class[Cassandra]                                        = classOf[java.math.BigDecimal]
       def toCassandra(in: scala.BigDecimal, dataType: DataType): Cassandra   = in.bigDecimal
-      def fromCassandra(in: Cassandra, dataType: DataType): scala.BigDecimal = in
     }
 
   implicit val bigIntCassandraTypeMapper: CassandraTypeMapper.WithCassandra[scala.BigInt, java.math.BigInteger] =
@@ -132,7 +118,6 @@ object CassandraTypeMapper {
       type Cassandra = java.math.BigInteger
       def classType: Class[Cassandra]                                    = classOf[java.math.BigInteger]
       def toCassandra(in: scala.BigInt, dataType: DataType): Cassandra   = in.bigInteger
-      def fromCassandra(in: Cassandra, dataType: DataType): scala.BigInt = in
     }
 
   /** We require proof that A has a ToUdtValue[A] in order to turn any A into a UdtValue and proof that A has a
@@ -147,8 +132,7 @@ object CassandraTypeMapper {
     * @return
     */
   implicit def udtCassandraTypeMapper[A](implicit
-    evToUdt: Lazy[ToUdtValue.Object[A]],
-    evFromUdt: Lazy[FromUdtValue.Object[A]]
+    evToUdt: Lazy[ToUdtValue.Object[A]]
   ): CassandraTypeMapper.WithCassandra[A, UdtValue] =
     new CassandraTypeMapper[A] {
       override type Cassandra = UdtValue
@@ -159,9 +143,6 @@ object CassandraTypeMapper {
         val schema = dataType.asInstanceOf[UserDefinedType]
         evToUdt.value.convert(FieldName.Unused, in, schema.newValue())
       }
-
-      override def fromCassandra(in: Cassandra, dataType: DataType): A =
-        evFromUdt.value.convert(FieldName.Unused, in)
     }
 
   implicit def setCassandraTypeMapper[A](implicit
@@ -176,11 +157,6 @@ object CassandraTypeMapper {
         val elementOfSetDataType = dataType.asInstanceOf[DefaultSetType].getElementType
         in.map(ev.toCassandra(_, elementOfSetDataType)).asJava
       }
-
-      override def fromCassandra(in: Cassandra, dataType: DataType): Set[A] = {
-        val elementOfSetDataType = dataType.asInstanceOf[DefaultSetType].getElementType
-        in.asScala.map(ev.fromCassandra(_, elementOfSetDataType)).toSet
-      }
     }
 
   implicit def listCassandraTypeMapper[A](implicit
@@ -194,11 +170,6 @@ object CassandraTypeMapper {
       override def toCassandra(in: List[A], dataType: DataType): Cassandra = {
         val elementOfSetDataType = dataType.asInstanceOf[DefaultListType].getElementType
         in.map(ev.toCassandra(_, elementOfSetDataType)).asJava
-      }
-
-      override def fromCassandra(in: Cassandra, dataType: DataType): List[A] = {
-        val elementOfListDataType = dataType.asInstanceOf[DefaultListType].getElementType
-        in.asScala.map(ev.fromCassandra(_, elementOfListDataType)).toList
       }
     }
 
@@ -219,15 +190,6 @@ object CassandraTypeMapper {
           (kEv.toCassandra(k, keyDataType), vEv.toCassandra(v, valueDataType))
         }.asJava
       }
-
-      override def fromCassandra(in: Cassandra, dataType: DataType): Map[K, V] = {
-        val mapDataType   = dataType.asInstanceOf[DefaultMapType]
-        val keyDataType   = mapDataType.getKeyType
-        val valueDataType = mapDataType.getValueType
-        in.asScala.map { case (kC, vC) =>
-          (kEv.fromCassandra(kC, keyDataType), vEv.fromCassandra(vC, valueDataType))
-        }.toMap
-      }
     }
 
   implicit def optionCassandraTypeMapper[A, Cass](implicit
@@ -244,10 +206,5 @@ object CassandraTypeMapper {
           case Some(value) => value
           case None        => null.asInstanceOf[Cassandra]
         }
-
-      override def fromCassandra(in: Cassandra, dataType: DataType): Option[A] =
-        Option(in).map(ev.fromCassandra(_, dataType))
-
-      override def allowNullable: Boolean = true
     }
 }

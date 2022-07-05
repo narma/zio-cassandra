@@ -81,8 +81,8 @@ create table tests.reads_type_test(
                                 count int,
                                 flag boolean,
                                 dataset frozen<set<int>>,
-                                datalist list<int>,
-                                datamap map<int, text>,
+                                datalist frozen<list<int>>,
+                                datamap frozen<map<int, text>>,
                                 PRIMARY KEY (id)
 );
 
@@ -122,3 +122,80 @@ create table tests.reads_snake_name_test(
 );
 
 insert into tests.reads_snake_name_test (id, allupper, alllower, some_name, some_long_name) values (0, 'ALL-UPPER', 'all-lower', 'some-name', 'some-long-name');
+
+create type tests.udt_for_udt_reads_type_test(
+    data text,
+    count int,
+    flag boolean,
+    dataset frozen<set<int>>,
+    datalist frozen<list<int>>,
+    datamap frozen<map<int, text>>
+);
+
+create table tests.udt_reads_type_test(
+                                    id bigint,
+                                    udt frozen<udt_for_udt_reads_type_test>,
+                                    PRIMARY KEY (id)
+);
+
+insert into tests.udt_reads_type_test (id, udt)
+values (0, {data: 'zero', count: null, flag: null, dataset: null, datalist: null, datamap: null});
+
+insert into tests.udt_reads_type_test (id, udt)
+values (1, {data: 'one', count: null, flag: null, dataset: {}, datalist: [], datamap: {}});
+
+insert into tests.udt_reads_type_test (id, udt)
+values (2, {data: 'two', count: 20, flag: false, dataset: {200}, datalist: [210], datamap: {220: '2_zero'}});
+
+insert into tests.udt_reads_type_test (id, udt)
+values (3, {data: 'three', count: 30, flag: true, dataset: {300, 301, 302}, datalist: [310, 311, 312], datamap: {320: '3_zero', 321: '3_one'}});
+
+insert into tests.udt_reads_type_test (id, udt)
+values (4, {data: 'four'});
+
+create type tests.udt_for_udt_reads_default_name_test(
+    allupper text,
+    alllower text,
+    someName text,
+    someLongName text
+);
+
+create table tests.udt_reads_default_name_test(
+                                            id bigint,
+                                            udt udt_for_udt_reads_default_name_test,
+                                            PRIMARY KEY (id)
+);
+
+insert into tests.udt_reads_default_name_test (id, udt)
+values (0, {allupper: 'ALL-UPPER', alllower: 'all-lower', someName: 'some-name', someLongName: 'some-long-name'});
+
+create type tests.udt_for_udt_reads_snake_name_test(
+    allupper text,
+    alllower text,
+    some_name text,
+    some_long_name text
+);
+
+create table tests.udt_reads_snake_name_test(
+                                          id bigint,
+                                          udt udt_for_udt_reads_snake_name_test,
+                                          PRIMARY KEY (id)
+);
+
+insert into tests.udt_reads_snake_name_test (id, udt)
+values (0, {allupper: 'ALL-UPPER', alllower: 'all-lower', some_name: 'some-name', some_long_name: 'some-long-name'});
+
+create table tests.nullable_collection_tests
+(
+    id           int,
+    regular_list list<int>,
+    frozen_list  frozen<list<int>>,
+    PRIMARY KEY (id)
+);
+
+insert into tests.nullable_collection_tests (id)
+values (0);
+insert into tests.nullable_collection_tests (id, regular_list, frozen_list)
+values (0, null, null);
+insert into tests.nullable_collection_tests (id, regular_list, frozen_list)
+values (0, [], []);
