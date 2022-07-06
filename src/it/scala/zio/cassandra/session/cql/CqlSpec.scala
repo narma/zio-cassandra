@@ -20,9 +20,6 @@ object CqlSpec {
   case class OptData(id: Long, data: Option[String])
 
   case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
-  object BasicInfo {
-    implicit val cqlBinder: Binder[BasicInfo] = ToUdtValue.deriveBinder[BasicInfo]
-  }
 
   val personAttributeIdxCounter = new AtomicInteger(0)
 
@@ -30,9 +27,6 @@ object CqlSpec {
   case class OptPersonAttribute(personId: Int, info: Option[BasicInfo])
 
   case class OptBasicInfo(weight: Option[Double], height: Option[String], datapoints: Option[Set[Int]])
-  object OptBasicInfo {
-    implicit val cqlBinder: Binder[OptBasicInfo] = ToUdtValue.deriveBinder[OptBasicInfo]
-  }
 
   case class PersonOptAttribute(personId: Int, info: OptBasicInfo)
 
@@ -48,16 +42,8 @@ object CqlSpec {
   case class ExampleNestedType(a: Int, b: String, c: Option[ExampleType])
 
   case class ExampleCollectionNestedUdtType(a: Int, b: Map[Int, Set[Set[Set[Set[ExampleNestedType]]]]])
-  object ExampleCollectionNestedUdtType {
-    implicit val binderExampleCollectionNestedUdtType: Binder[ExampleCollectionNestedUdtType] =
-      ToUdtValue.deriveBinder[ExampleCollectionNestedUdtType]
-  }
 
   case class ExampleNestedPrimitiveType(a: Int, b: Map[Int, Set[Set[Set[Set[Int]]]]])
-  object ExampleNestedPrimitiveType {
-    implicit val binderExampleNestedPrimitiveType: Binder[ExampleNestedPrimitiveType] =
-      ToUdtValue.deriveBinder[ExampleNestedPrimitiveType]
-  }
 
   case class TableContainingExampleCollectionNestedUdtType(id: Int, data: ExampleCollectionNestedUdtType)
 

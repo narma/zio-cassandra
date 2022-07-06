@@ -43,7 +43,7 @@ object RawReads extends RawReadsInstances1 {
   def instance[T](f: (ByteBuffer, ProtocolVersion) => IO[RawReads.Error, T]): RawReads[T] =
     (bytes: ByteBuffer, protocol: ProtocolVersion, _) => f(bytes, protocol)
 
-  implicit class RawReadsOps[A](private val reads: RawReads[A]) extends AnyVal {
+  final implicit class RawReadsOps[A](private val reads: RawReads[A]) extends AnyVal {
 
     def map[B](f: A => B): RawReads[B] = flatMap(a => ZIO.succeed(f(a)))
 
@@ -52,7 +52,7 @@ object RawReads extends RawReadsInstances1 {
 
   }
 
-  implicit class SafeInstanceOf[T](private val value: T) extends AnyVal {
+  final implicit class SafeInstanceOf[T](private val value: T) extends AnyVal {
     def safeInstanceOf[V <: T](implicit vClass: ClassTag[V], tClass: ClassTag[T]): IO[InternalError, V] =
       value match {
         case v: V => ZIO.succeed(v)
