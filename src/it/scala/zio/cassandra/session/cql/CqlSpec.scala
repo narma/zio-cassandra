@@ -64,6 +64,15 @@ object CqlSpec {
         results  <- query.select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
+    testM("interpolated select template should return tuples from migration") {
+      for {
+        prepared <- cqlt"select id, data, dataset FROM tests.test_data WHERE id in ${Put[List[Long]]}"
+          .as[(Long, String, Option[Set[Int]])]
+          .prepare
+        query     = prepared(List[Long](1, 2, 3))
+        results  <- query.select.runCollect
+      } yield assertTrue(results == Chunk((1L, "one", Some(Set.empty[Int])), (2L, "two", Some(Set(201))), (3L, "three", None)))
+    },
     testM("interpolated select template should return tuples from migration with multiple binding") {
       for {
         query   <-
