@@ -1,9 +1,9 @@
 package zio.cassandra.session
 
-import com.datastax.oss.driver.api.core.cql.{Row, SimpleStatement}
-import zio.{IO, Task, ZIO}
+import com.datastax.oss.driver.api.core.cql.{ Row, SimpleStatement }
 import zio.cassandra.session.cql.codec.Reads
 import zio.test.TestFailure
+import zio.{ IO, ZIO }
 
 trait CassandraSpecUtils {
 
@@ -12,7 +12,7 @@ trait CassandraSpecUtils {
   implicit def toStatement(s: String): SimpleStatement = SimpleStatement.newInstance(s)
 
   def read[T: Reads](row: Row): IO[TestFailure[Throwable], T] =
-    Task(Reads[T].read(row)).mapError(TestFailure.die)
+    ZIO.attempt(Reads[T].read(row)).mapError(TestFailure.die)
 
   def readOpt[T: Reads](row: Option[Row]): IO[TestFailure[Throwable], Option[T]] =
     ZIO.foreach(row)(read[T](_))

@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
-import zio.stream.Stream
+import zio.stream.{ Stream, ZStream }
 import zio.stream.ZStream.Pull
 
 import scala.jdk.CollectionConverters.IterableHasAsScala
@@ -39,13 +39,13 @@ trait Session {
 object Session {
   private final case class Live(private val underlying: CqlSession) extends Session {
     override def prepare(stmt: String): Task[PreparedStatement] =
-      Task.fromCompletionStage(underlying.prepareAsync(stmt))
+      ZIO.fromCompletionStage(underlying.prepareAsync(stmt))
 
     override def execute(stmt: Statement[_]): Task[AsyncResultSet] =
-      Task.fromCompletionStage(underlying.executeAsync(stmt))
+      ZIO.fromCompletionStage(underlying.executeAsync(stmt))
 
     override def execute(query: String): Task[AsyncResultSet] =
-      Task.fromCompletionStage(underlying.executeAsync(query))
+      ZIO.fromCompletionStage(underlying.executeAsync(query))
 
     override def select(stmt: Statement[_]): Stream[Throwable, Row] = {
       def pull(ref: Ref[ZIO[Any, Option[Throwable], AsyncResultSet]]): ZIO[Any, Option[Throwable], Chunk[Row]] =
@@ -54,15 +54,15 @@ object Session {
           rs <- io
           _  <- rs match {
                   case _ if rs.hasMorePages                     =>
-                    ref.set(Task.fromCompletionStage(rs.fetchNextPage()).mapError(Option(_)))
+                    ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).mapError(Option(_)))
                   case _ if rs.currentPage().iterator().hasNext => ref.set(Pull.end)
                   case _                                        => Pull.end
                 }
         } yield Chunk.fromIterable(rs.currentPage().asScala)
 
-      Stream {
+      ZStream.fromPull {
         for {
-          ref <- Ref.make(execute(stmt).mapError(Option(_))).toManaged_
+          ref <- Ref.make(execute(stmt).mapError(Option(_)))
         } yield pull(ref)
       }
     }
@@ -76,15 +76,15 @@ object Session {
     override def name: String = underlying.getName
 
     override def refreshSchema: Task[Metadata] =
-      Task.fromCompletionStage(underlying.refreshSchemaAsync())
+      ZIO.fromCompletionStage(underlying.refreshSchemaAsync())
 
     override def setSchemaMetadataEnabled(newValue: Boolean): Task[Metadata] =
-      Task.fromCompletionStage(underlying.setSchemaMetadataEnabled(newValue))
+      ZIO.fromCompletionStage(underlying.setSchemaMetadataEnabled(newValue))
 
     override def isSchemaMetadataEnabled: Boolean = underlying.isSchemaMetadataEnabled
 
     override def checkSchemaAgreement: Task[Boolean] =
-      Task
+      ZIO
         .fromCompletionStage(underlying.checkSchemaAgreementAsync())
         .map(Boolean.unbox)
 
@@ -93,15 +93,13 @@ object Session {
     override def keyspace: Option[CqlIdentifier] = underlying.getKeyspace.toScala
   }
 
-  def live: ZManaged[Has[CqlSessionBuilder], Throwable, Session] =
-    ZManaged.serviceWithManaged[CqlSessionBuilder] { cqlSessionBuilder =>
-      make(cqlSessionBuilder)
-    }
+  val live: RIO[Scope with CqlSessionBuilder, Session] =
+    ZIO.serviceWithZIO[CqlSessionBuilder](cqlSessionBuilder => make(cqlSessionBuilder))
 
-  def make(builder: => CqlSessionBuilder): TaskManaged[Session] =
-    ZManaged
-      .make(Task.fromCompletionStage(builder.buildAsync())) { session =>
-        Task.fromCompletionStage(session.closeAsync()).orDie
+  def make(builder: => CqlSessionBuilder): RIO[Scope, Session] =
+    ZIO
+      .acquireRelease(ZIO.fromCompletionStage(builder.buildAsync())) { session =>
+        ZIO.fromCompletionStage(session.closeAsync()).orDie
       }
       .map(Live)
 

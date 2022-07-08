@@ -2,7 +2,7 @@ package zio.cassandra.session.cql.codec
 
 import zio.cassandra.session.{ CassandraSpecUtils, Session }
 import zio.test.Assertion.hasSameElements
-import zio.test.{ assert, assertTrue, suite, testM }
+import zio.test._
 import zio.{ Chunk, ZIO }
 
 object ReadsSpec extends CassandraSpecUtils {
@@ -26,7 +26,7 @@ object ReadsSpec extends CassandraSpecUtils {
   private val nameTestData = NameTestData(0, "ALL-UPPER", "all-lower", "some-name", "some-long-name")
 
   val readsTests = suite("Reads")(
-    testM("should read simple data types") {
+    test("should read simple data types") {
       val expected =
         Chunk(
           TypeTestData(0, "zero", None, None, None, None, None),
@@ -48,22 +48,22 @@ object ReadsSpec extends CassandraSpecUtils {
         session <- ZIO.service[Session]
         result  <- session
                      .select(s"select id, data, count, flag, dataset, datalist, datamap FROM $keyspace.reads_type_test")
-                     .mapM(read[TypeTestData](_))
+                     .mapZIO(read[TypeTestData](_))
                      .runCollect
       } yield assert(result)(hasSameElements(expected))
     },
-    testM("should read cassandra lists as chunks") {
+    test("should read cassandra lists as chunks") {
       val expected = Chunk(ChunkTestData(2, Chunk(210)), ChunkTestData(3, Chunk(310, 311, 312)))
 
       for {
         session <- ZIO.service[Session]
         result  <- session
                      .select(s"select id, datalist FROM $keyspace.reads_type_test where id in (2, 3)")
-                     .mapM(read[ChunkTestData](_))
+                     .mapZIO(read[ChunkTestData](_))
                      .runCollect
       } yield assert(result)(hasSameElements(expected))
     },
-    testM("should read names as is") {
+    test("should read names as is") {
       implicit val configuration: Configuration = Configuration(identity(_))
 
       for {
@@ -75,7 +75,7 @@ object ReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read names as is regardless of order in row") {
+    test("should read names as is regardless of order in row") {
       implicit val configuration: Configuration = Configuration(identity(_))
 
       for {
@@ -87,7 +87,7 @@ object ReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read names transformed to snake_case") {
+    test("should read names transformed to snake_case") {
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -97,7 +97,7 @@ object ReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read names transformed to snake_case regardless of order in row") {
+    test("should read names transformed to snake_case regardless of order in row") {
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -107,12 +107,12 @@ object ReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read nulls and empty collections to empty collections") {
+    test("should read nulls and empty collections to empty collections") {
       for {
         session <- ZIO.service[Session]
         result  <- session
                      .select(s"select id, regular_list, frozen_list FROM $keyspace.nullable_collection_tests")
-                     .mapM(read[NullableCollectionsTestData](_))
+                     .mapZIO(read[NullableCollectionsTestData](_))
                      .runCollect
       } yield assertTrue(result.forall(d => d.regularList.isEmpty && d.frozenList.isEmpty))
     }

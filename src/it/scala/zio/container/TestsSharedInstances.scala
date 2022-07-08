@@ -6,22 +6,21 @@ import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfig
 import com.dimafeng.testcontainers.CassandraContainer
 import com.typesafe.config.ConfigFactory
 import zio._
-import zio.blocking.Blocking
 import zio.cassandra.session.Session
 import zio.stream._
-import zio.test.{ AbstractRunnableSpec, TestFailure }
+import zio.test.{ TestFailure, ZIOSpec }
 
 import java.net.InetSocketAddress
 import scala.jdk.CollectionConverters.IterableHasAsJava
 
-trait TestsSharedInstances { self: AbstractRunnableSpec =>
+trait TestsSharedInstances { self: ZIOSpec[_] =>
 
   val keyspace = "tests"
 
-  def migrateSession(session: Session): RIO[Blocking, Unit] = {
-    val migrations = Stream
+  def migrateSession(session: Session): Task[Unit] = {
+    val migrations = ZStream
       .fromResource("migration/1__test_tables.cql")
-      .transduce(ZTransducer.utf8Decode >>> ZTransducer.splitLines)
+      .via(ZPipeline.utf8Decode >>> ZPipeline.splitLines)
       .filterNot { line =>
         val l = line.stripLeading()
         l.startsWith("//") || l.startsWith("--")
@@ -35,7 +34,7 @@ trait TestsSharedInstances { self: AbstractRunnableSpec =>
       _          <- ZIO.debug("start migrations")
       migrations <- migrations
 
-      _ <- ZIO.foreach_(migrations) { migration =>
+      _ <- ZIO.foreachDiscard(migrations) { migration =>
              val st = SimpleStatement.newInstance(migration)
              session.execute(st)
            }
@@ -45,36 +44,40 @@ trait TestsSharedInstances { self: AbstractRunnableSpec =>
 
   def ensureKeyspaceExists(builder: CqlSessionBuilder): Task[Unit] =
     for {
-      session <- Task.fromCompletionStage(builder.withKeyspace(Option.empty[String].orNull).buildAsync())
+      session <- ZIO.fromCompletionStage(builder.withKeyspace(Option.empty[String].orNull).buildAsync())
       _       <-
-        Task
+        ZIO
           .fromCompletionStage(
             session.executeAsync(
               s"CREATE KEYSPACE IF NOT EXISTS $keyspace WITH replication = {'class':'SimpleStrategy', 'replication_factor':1};"
             )
           )
           .unless(session.getMetadata.getKeyspace(keyspace).isPresent)
-      _       <- Task.fromCompletionStage(session.closeAsync())
+      _       <- ZIO.fromCompletionStage(session.closeAsync())
     } yield ()
 
-  val layerCassandra = ZTestContainer.cassandra
+  val layerCassandra: ZLayer[Scope, TestFailure[Nothing], CassandraContainer] = ZTestContainer.cassandra
 
-  val layerSession = (for {
-    cassandra <- ZManaged.service[CassandraContainer]
-    address    = new InetSocketAddress(cassandra.containerIpAddress, cassandra.mappedPort(9042))
-    config    <- Task(ConfigFactory.load().getConfig("cassandra.test-driver")).toManaged_
-    builder    = CqlSession
-                   .builder()
-                   .addContactPoints(Seq(address).asJavaCollection)
-                   .withLocalDatacenter("datacenter1")
-                   .withConfigLoader(new DefaultDriverConfigLoader(() => config, false))
-                   .withKeyspace(keyspace)
-    _         <- ensureKeyspaceExists(builder).toManaged_
+  val layerSession: ZLayer[Scope with CassandraContainer, TestFailure[Nothing], Session] =
+    ZLayer.fromZIO {
+      for {
+        cassandra <- ZIO.service[CassandraContainer]
+        address    = new InetSocketAddress(cassandra.containerIpAddress, cassandra.mappedPort(9042))
+        config    <- ZIO.attempt(ConfigFactory.load().getConfig("cassandra.test-driver"))
+        builder    = CqlSession
+                       .builder()
+                       .addContactPoints(Seq(address).asJavaCollection)
+                       .withLocalDatacenter("datacenter1")
+                       .withConfigLoader(new DefaultDriverConfigLoader(() => config, false))
+                       .withKeyspace(keyspace)
+        _         <- ensureKeyspaceExists(builder)
 
-    session <- Session.make(builder)
-    _       <- migrateSession(session).toManaged_
-  } yield session).toLayer.mapError(TestFailure.die)
+        session <- Session.make(builder)
+        _       <- migrateSession(session)
+      } yield session
+    }.mapError(TestFailure.die)
 
-  val layer: ZLayer[Blocking, TestFailure[Nothing], Has[Session] with Has[CassandraContainer]] =
-    ZLayer.requires[Blocking] >+> layerCassandra >+> layerSession
+  val layer: ZLayer[Scope, TestFailure[Nothing], CassandraContainer with Session] =
+    ZLayer.environment[Scope] >+> layerCassandra >+> layerSession
+
 }

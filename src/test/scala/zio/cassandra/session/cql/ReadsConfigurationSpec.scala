@@ -2,13 +2,12 @@ package zio.cassandra.session.cql
 
 import zio.cassandra.session.cql.codec.Configuration
 import zio.test._
-import zio.test.environment.TestEnvironment
 
-object ReadsConfigurationSpec extends DefaultRunnableSpec {
+object ReadsConfigurationSpec extends ZIOSpecDefault {
 
   private val toSnakeCase = Configuration.snakeCaseTransformation
 
-  override def spec: ZSpec[TestEnvironment, Any] =
+  override def spec: Spec[TestEnvironment, Any] =
     suite("Reads Configuration")(
       suite("snake_case field name transformer")(
         test("should not modify lower cased names") {

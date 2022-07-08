@@ -4,7 +4,7 @@ object Dependencies {
 
   val cassandraDriverVersion = "4.14.0"
 
-  val zioVersion = "1.0.13"
+  val zioVersion = "2.0.0"
 
   val testContainersVersion = "0.40.2"
 
