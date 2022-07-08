@@ -13,12 +13,12 @@ class Query[R: Reads] private[cql] (
   def config(statement: BoundStatement => BoundStatement) = new Query[R](session, statement(this.statement))
 
   def select: Stream[Throwable, R]                        = session.select(statement).mapChunksM { chunk =>
-    chunk.mapM(Reads[R].read(_))
+    chunk.mapM(row => Task(Reads[R].read(row)))
   }
 
   def selectFirst: Task[Option[R]]                        = session.selectFirst(statement).flatMap {
     case None      => ZIO.none
-    case Some(row) => Reads[R].read(row).map(Some(_))
+    case Some(row) => Task(Reads[R].read(row)).map(Some(_))
   }
 
   def execute: Task[Boolean]                              = session.execute(statement).map(_.wasApplied)

@@ -1,9 +1,8 @@
 package zio.cassandra.session.cql.codec
 
-import com.datastax.oss.driver.api.core.cql.Row
+import com.datastax.oss.driver.api.core.cql.{ ColumnDefinition, Row }
 import shapeless._
 import shapeless.labelled.{ field, FieldType }
-import zio._
 import zio.cassandra.session.cql.codec.Reads.instance
 
 import scala.annotation.nowarn
@@ -15,7 +14,7 @@ import scala.annotation.nowarn
   */
 trait Reads[T] {
 
-  def read(row: Row): Task[T]
+  def read(row: Row): T
 
 }
 
@@ -23,21 +22,20 @@ object Reads extends ReadsInstances1 {
 
   def apply[T](implicit reads: Reads[T]): Reads[T] = reads
 
-  def instance[T](f: Row => Task[T]): Reads[T] = (row: Row) => f(row)
+  def instance[T](f: Row => T): Reads[T] = (row: Row) => f(row)
 
 }
 
 trait ReadsInstances1 extends ReadsInstances2 {
 
-  implicit val rowReads: Reads[Row] = instance(ZIO.succeed(_))
+  implicit val rowReads: Reads[Row] = instance(identity)
 
   implicit def tuple1Reads[
     T1: RawReads
   ]: Reads[Tuple1[T1]] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-      } yield Tuple1(t1)
+      val t1 = readByIndex[T1](row, 0)
+      Tuple1(t1)
     }
 
   implicit def tuple2Reads[
@@ -45,10 +43,9 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T2: RawReads
   ]: Reads[(T1, T2)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-      } yield (t1, t2)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      (t1, t2)
     }
 
   implicit def tuple3Reads[
@@ -57,11 +54,10 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T3: RawReads
   ]: Reads[(T1, T2, T3)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-      } yield (t1, t2, t3)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      (t1, t2, t3)
     }
 
   implicit def tuple4Reads[
@@ -71,12 +67,11 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T4: RawReads
   ]: Reads[(T1, T2, T3, T4)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-      } yield (t1, t2, t3, t4)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      val t4 = readByIndex[T4](row, 3)
+      (t1, t2, t3, t4)
     }
 
   implicit def tuple5Reads[
@@ -87,13 +82,12 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T5: RawReads
   ]: Reads[(T1, T2, T3, T4, T5)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-      } yield (t1, t2, t3, t4, t5)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      val t4 = readByIndex[T4](row, 3)
+      val t5 = readByIndex[T5](row, 4)
+      (t1, t2, t3, t4, t5)
     }
 
   implicit def tuple6Reads[
@@ -105,14 +99,13 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T6: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-      } yield (t1, t2, t3, t4, t5, t6)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      val t4 = readByIndex[T4](row, 3)
+      val t5 = readByIndex[T5](row, 4)
+      val t6 = readByIndex[T6](row, 5)
+      (t1, t2, t3, t4, t5, t6)
     }
 
   implicit def tuple7Reads[
@@ -125,15 +118,14 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T7: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-      } yield (t1, t2, t3, t4, t5, t6, t7)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      val t4 = readByIndex[T4](row, 3)
+      val t5 = readByIndex[T5](row, 4)
+      val t6 = readByIndex[T6](row, 5)
+      val t7 = readByIndex[T7](row, 6)
+      (t1, t2, t3, t4, t5, t6, t7)
     }
 
   implicit def tuple8Reads[
@@ -147,16 +139,15 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T8: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      val t4 = readByIndex[T4](row, 3)
+      val t5 = readByIndex[T5](row, 4)
+      val t6 = readByIndex[T6](row, 5)
+      val t7 = readByIndex[T7](row, 6)
+      val t8 = readByIndex[T8](row, 7)
+      (t1, t2, t3, t4, t5, t6, t7, t8)
     }
 
   implicit def tuple9Reads[
@@ -171,17 +162,16 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T9: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9)
+      val t1 = readByIndex[T1](row, 0)
+      val t2 = readByIndex[T2](row, 1)
+      val t3 = readByIndex[T3](row, 2)
+      val t4 = readByIndex[T4](row, 3)
+      val t5 = readByIndex[T5](row, 4)
+      val t6 = readByIndex[T6](row, 5)
+      val t7 = readByIndex[T7](row, 6)
+      val t8 = readByIndex[T8](row, 7)
+      val t9 = readByIndex[T9](row, 8)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9)
     }
 
   implicit def tuple10Reads[
@@ -197,18 +187,17 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T10: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
     }
 
   implicit def tuple11Reads[
@@ -225,19 +214,18 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T11: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
     }
 
   implicit def tuple12Reads[
@@ -255,20 +243,19 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T12: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12)
     }
 
   implicit def tuple13Reads[
@@ -287,21 +274,20 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T13: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13)
     }
 
   implicit def tuple14Reads[
@@ -321,22 +307,21 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T14: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14)
     }
 
   implicit def tuple15Reads[
@@ -357,23 +342,22 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T15: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15)
     }
 
   implicit def tuple16Reads[
@@ -395,24 +379,23 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T16: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16)
     }
 
   implicit def tuple17Reads[
@@ -435,25 +418,24 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T17: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-        t17 <- readByIndex[T17](row, 16)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      val t17 = readByIndex[T17](row, 16)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17)
     }
 
   implicit def tuple18Reads[
@@ -477,26 +459,25 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T18: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-        t17 <- readByIndex[T17](row, 16)
-        t18 <- readByIndex[T18](row, 17)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      val t17 = readByIndex[T17](row, 16)
+      val t18 = readByIndex[T18](row, 17)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18)
     }
 
   implicit def tuple19Reads[
@@ -521,27 +502,26 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T19: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-        t17 <- readByIndex[T17](row, 16)
-        t18 <- readByIndex[T18](row, 17)
-        t19 <- readByIndex[T19](row, 18)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      val t17 = readByIndex[T17](row, 16)
+      val t18 = readByIndex[T18](row, 17)
+      val t19 = readByIndex[T19](row, 18)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19)
     }
 
   implicit def tuple20Reads[
@@ -567,28 +547,27 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T20: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-        t17 <- readByIndex[T17](row, 16)
-        t18 <- readByIndex[T18](row, 17)
-        t19 <- readByIndex[T19](row, 18)
-        t20 <- readByIndex[T20](row, 19)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      val t17 = readByIndex[T17](row, 16)
+      val t18 = readByIndex[T18](row, 17)
+      val t19 = readByIndex[T19](row, 18)
+      val t20 = readByIndex[T20](row, 19)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20)
     }
 
   implicit def tuple21Reads[
@@ -615,29 +594,28 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T21: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-        t17 <- readByIndex[T17](row, 16)
-        t18 <- readByIndex[T18](row, 17)
-        t19 <- readByIndex[T19](row, 18)
-        t20 <- readByIndex[T20](row, 19)
-        t21 <- readByIndex[T21](row, 20)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      val t17 = readByIndex[T17](row, 16)
+      val t18 = readByIndex[T18](row, 17)
+      val t19 = readByIndex[T19](row, 18)
+      val t20 = readByIndex[T20](row, 19)
+      val t21 = readByIndex[T21](row, 20)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21)
     }
 
   implicit def tuple22Reads[
@@ -665,37 +643,36 @@ trait ReadsInstances1 extends ReadsInstances2 {
     T22: RawReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22)] =
     instance { row =>
-      for {
-        t1  <- readByIndex[T1](row, 0)
-        t2  <- readByIndex[T2](row, 1)
-        t3  <- readByIndex[T3](row, 2)
-        t4  <- readByIndex[T4](row, 3)
-        t5  <- readByIndex[T5](row, 4)
-        t6  <- readByIndex[T6](row, 5)
-        t7  <- readByIndex[T7](row, 6)
-        t8  <- readByIndex[T8](row, 7)
-        t9  <- readByIndex[T9](row, 8)
-        t10 <- readByIndex[T10](row, 9)
-        t11 <- readByIndex[T11](row, 10)
-        t12 <- readByIndex[T12](row, 11)
-        t13 <- readByIndex[T13](row, 12)
-        t14 <- readByIndex[T14](row, 13)
-        t15 <- readByIndex[T15](row, 14)
-        t16 <- readByIndex[T16](row, 15)
-        t17 <- readByIndex[T17](row, 16)
-        t18 <- readByIndex[T18](row, 17)
-        t19 <- readByIndex[T19](row, 18)
-        t20 <- readByIndex[T20](row, 19)
-        t21 <- readByIndex[T21](row, 20)
-        t22 <- readByIndex[T22](row, 21)
-      } yield (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22)
+      val t1  = readByIndex[T1](row, 0)
+      val t2  = readByIndex[T2](row, 1)
+      val t3  = readByIndex[T3](row, 2)
+      val t4  = readByIndex[T4](row, 3)
+      val t5  = readByIndex[T5](row, 4)
+      val t6  = readByIndex[T6](row, 5)
+      val t7  = readByIndex[T7](row, 6)
+      val t8  = readByIndex[T8](row, 7)
+      val t9  = readByIndex[T9](row, 8)
+      val t10 = readByIndex[T10](row, 9)
+      val t11 = readByIndex[T11](row, 10)
+      val t12 = readByIndex[T12](row, 11)
+      val t13 = readByIndex[T13](row, 12)
+      val t14 = readByIndex[T14](row, 13)
+      val t15 = readByIndex[T15](row, 14)
+      val t16 = readByIndex[T16](row, 15)
+      val t17 = readByIndex[T17](row, 16)
+      val t18 = readByIndex[T18](row, 17)
+      val t19 = readByIndex[T19](row, 18)
+      val t20 = readByIndex[T20](row, 19)
+      val t21 = readByIndex[T21](row, 20)
+      val t22 = readByIndex[T22](row, 21)
+      (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22)
     }
 
 }
 
 trait ReadsInstances2 extends ReadsInstances3 {
 
-  implicit val hNilReads: Reads[HNil] = instance(_ => ZIO.succeed(HNil))
+  implicit val hNilReads: Reads[HNil] = instance(_ => HNil)
 
   implicit def hConsReads[K <: Symbol, H, T <: HList](implicit
     configuration: Configuration,
@@ -704,13 +681,12 @@ trait ReadsInstances2 extends ReadsInstances3 {
     fieldNameW: Witness.Aux[K]
   ): Reads[FieldType[K, H] :: T] =
     instance { row =>
-      for {
-        fieldName <- ZIO.succeed(configuration.transformFieldNames(fieldNameW.value.name))
-        head      <- hReads
-                       .read(row.getBytesUnsafe(fieldName), row.protocolVersion(), row.getType(fieldName))
-                       .mapError(toThrowable(_, row, fieldName))
-        tail      <- tReads.read(row)
-      } yield field[K](head) :: tail
+      val fieldName = configuration.transformFieldNames(fieldNameW.value.name)
+      val bytes     = row.getBytesUnsafe(fieldName)
+      val fieldType = row.getType(fieldName)
+      val head      = withRefinedError(hReads.read(bytes, row.protocolVersion(), fieldType))(row, fieldName)
+      val tail      = tReads.read(row)
+      field[K](head) :: tail
     }
 
   implicit def genericReads[T, Repr](implicit
@@ -719,24 +695,27 @@ trait ReadsInstances2 extends ReadsInstances3 {
     gen: LabelledGeneric.Aux[T, Repr],
     reads: Reads[Repr]
   ): Reads[T] =
-    instance(row => reads.read(row).map(gen.from))
+    instance(row => gen.from(reads.read(row)))
 
-  private def toThrowable(error: RawReads.Error, row: Row, fieldName: String): Throwable =
-    error match {
-      case RawReads.UnexpectedNullError  => UnexpectedNullValueInColumn(row, fieldName)
-      case RawReads.InternalError(cause) => cause
-    }
+  private def withRefinedError[T](expr: => T)(row: Row, fieldName: String): T =
+    try expr
+    catch refineError(row, row.getColumnDefinitions.get(fieldName))
 
 }
 
 trait ReadsInstances3 {
 
+  protected def refineError(row: Row, columnDefinition: ColumnDefinition): PartialFunction[Throwable, Nothing] = {
+    case UnexpectedNullValue.NullValueInColumn                 =>
+      throw UnexpectedNullValueInColumn(row, columnDefinition)
+    case UnexpectedNullValue.NullValueInUdt(udt, udtFieldName) =>
+      throw UnexpectedNullValueInUdt(row, columnDefinition, udt, udtFieldName)
+  }
+
   implicit def readsFromRawReads[T: RawReads]: Reads[T] = instance(readByIndex(_, 0))
 
-  protected def readByIndex[T: RawReads](row: Row, index: Int): Task[T] =
-    RawReads[T].read(row.getBytesUnsafe(index), row.protocolVersion(), row.getType(index)).mapError {
-      case RawReads.UnexpectedNullError  => UnexpectedNullValueInColumn(row, index)
-      case RawReads.InternalError(cause) => cause
-    }
+  protected def readByIndex[T: RawReads](row: Row, index: Int): T =
+    try RawReads[T].read(row.getBytesUnsafe(index), row.protocolVersion(), row.getType(index))
+    catch refineError(row, row.getColumnDefinitions.get(index))
 
 }

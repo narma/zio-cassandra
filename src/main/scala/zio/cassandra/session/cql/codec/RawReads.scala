@@ -7,14 +7,12 @@ import com.datastax.oss.driver.api.core.`type`.codec.registry.CodecRegistry
 import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
 import zio.cassandra.session.cql.codec.RawReads._
-import zio.{ IO, Task, ZIO }
 
 import java.nio.ByteBuffer
 import java.time.{ Instant, LocalDate, LocalTime }
 import java.util.UUID
 import scala.collection.Factory
 import scala.jdk.CollectionConverters.{ IterableHasAsScala, MapHasAsScala, SetHasAsScala }
-import scala.reflect.ClassTag
 
 /** Low-level alternative for [[com.datastax.oss.driver.api.core.type.codec.TypeCodec]] that is meant ot be resolved at
   * a compile-time.<br> Its main purpose is to provide a deserializer for a single column value (regardless of if it's a
@@ -22,7 +20,7 @@ import scala.reflect.ClassTag
   */
 trait RawReads[T] {
 
-  def read(bytes: ByteBuffer, protocol: ProtocolVersion, dataType: DataType): IO[RawReads.Error, T]
+  def read(bytes: ByteBuffer, protocol: ProtocolVersion, dataType: DataType): T
 
 }
 
@@ -36,31 +34,16 @@ object RawReads extends RawReadsInstances1 {
 
   def apply[T](implicit reads: RawReads[T]): RawReads[T] = reads
 
-  def instance[T](f: (ByteBuffer, ProtocolVersion, DataType) => IO[RawReads.Error, T]): RawReads[T] =
+  def instance[T](f: (ByteBuffer, ProtocolVersion, DataType) => T): RawReads[T] =
     (bytes: ByteBuffer, protocol: ProtocolVersion, dataType: DataType) => f(bytes, protocol, dataType)
 
-  def instance[T](f: (ByteBuffer, ProtocolVersion) => IO[RawReads.Error, T]): RawReads[T] =
+  def instance[T](f: (ByteBuffer, ProtocolVersion) => T): RawReads[T] =
     (bytes: ByteBuffer, protocol: ProtocolVersion, _) => f(bytes, protocol)
 
   final implicit class RawReadsOps[A](private val reads: RawReads[A]) extends AnyVal {
 
-    def map[B](f: A => B): RawReads[B] = flatMap(a => ZIO.succeed(f(a)))
+    def map[B](f: A => B): RawReads[B] = instance((b, p, d) => f(reads.read(b, p, d)))
 
-    def flatMap[B](f: A => IO[RawReads.Error, B]): RawReads[B] =
-      instance((b, p, d) => reads.read(b, p, d).flatMap(f))
-
-  }
-
-  final implicit class SafeInstanceOf[T](private val value: T) extends AnyVal {
-    def safeInstanceOf[V <: T](implicit vClass: ClassTag[V], tClass: ClassTag[T]): IO[InternalError, V] =
-      value match {
-        case v: V => ZIO.succeed(v)
-        case _    =>
-          val expected = tClass.runtimeClass.getSimpleName
-          val actual   = vClass.runtimeClass.getSimpleName
-
-          ZIO.fail(InternalError(new IllegalStateException(s"Couldn't convert $expected to $actual")))
-      }
   }
 
 }
@@ -90,7 +73,8 @@ trait RawReadsInstances1 extends RawReadsInstances2 {
 
   private def withCheckedNull[T](f: (ByteBuffer, ProtocolVersion) => T): RawReads[T] =
     instance { (bytes, protocol) =>
-      checkNull(bytes) *> Task(f(bytes, protocol)).mapError(InternalError)
+      requireNonNull(bytes)
+      f(bytes, protocol)
     }
 
 }
@@ -98,46 +82,40 @@ trait RawReadsInstances1 extends RawReadsInstances2 {
 trait RawReadsInstances2 extends RawReadsInstances3 {
 
   implicit def optionRawReads[T: RawReads]: RawReads[Option[T]] =
-    instance((bytes, protocol, dataType) => ZIO.foreach(Option(bytes))(RawReads[T].read(_, protocol, dataType)))
+    instance((bytes, protocol, dataType) => Option(bytes).map(RawReads[T].read(_, protocol, dataType)))
 
   implicit def iterableRawReads[T: RawReads, Coll[_] <: Iterable[_]](implicit
     f: Factory[T, Coll[T]]
   ): RawReads[Coll[T]] = {
     val cachedCodec = TypeCodecs.listOf(TypeCodecs.BLOB)
     instance { (bytes, protocol, dataType) =>
-      for {
-        listType  <- dataType.safeInstanceOf[DefaultListType]
-        listElType = listType.getElementType
-        r         <- ZIO
-                       .foreach(cachedCodec.decode(bytes, protocol).asScala)(RawReads[T].read(_, protocol, listElType))
-                       .map(f.fromSpecific)
-      } yield r
+      val listType   = dataType.asInstanceOf[DefaultListType]
+      val listElType = listType.getElementType
+      val elements = cachedCodec.decode(bytes, protocol).asScala.map(RawReads[T].read(_, protocol, listElType))
+      f.fromSpecific(elements)
     }
   }
 
   implicit def setRawReads[T: RawReads]: RawReads[Set[T]] = {
     val cachedCodec = TypeCodecs.setOf(TypeCodecs.BLOB)
     instance { (bytes, protocol, dataType) =>
-      for {
-        setType    <- dataType.safeInstanceOf[DefaultSetType]
-        setElType   = setType.getElementType
-        setOfBytes <- Task(cachedCodec.decode(bytes, protocol).asScala.toSet).mapError(InternalError)
-        set        <- ZIO.foreach(setOfBytes)(RawReads[T].read(_, protocol, setElType))
-      } yield set
+      val setType    = dataType.asInstanceOf[DefaultSetType]
+      val setElType  = setType.getElementType
+      val setOfBytes = cachedCodec.decode(bytes, protocol).asScala.toSet
+      setOfBytes.map(RawReads[T].read(_, protocol, setElType))
     }
   }
 
   implicit def mapRawReads[K: RawReads, V: RawReads]: RawReads[Map[K, V]] = {
     val cachedCodec = TypeCodecs.mapOf(TypeCodecs.BLOB, TypeCodecs.BLOB)
     instance { (bytes, protocol, dataType) =>
-      ZIO.foreach(cachedCodec.decode(bytes, protocol).asScala.toMap) { (key, value) =>
-        for {
-          mapType  <- dataType.safeInstanceOf[DefaultMapType]
-          keyType   = mapType.getKeyType
-          valueType = mapType.getValueType
-          k        <- RawReads[K].read(key, protocol, keyType)
-          v        <- RawReads[V].read(value, protocol, valueType)
-        } yield (k, v)
+      cachedCodec.decode(bytes, protocol).asScala.toMap.map { case (key, value) =>
+        val mapType   = dataType.asInstanceOf[DefaultMapType]
+        val keyType   = mapType.getKeyType
+        val valueType = mapType.getValueType
+        val k         = RawReads[K].read(key, protocol, keyType)
+        val v         = RawReads[V].read(value, protocol, valueType)
+        (k, v)
       }
     }
   }
@@ -150,14 +128,13 @@ trait RawReadsInstances3 {
 
   implicit val udtValueRawReads: RawReads[UdtValue] =
     instance { (bytes, protocol, dataType) =>
-      val codec = CodecRegistry.DEFAULT.codecFor(dataType, classOf[UdtValue])
-      checkNull(bytes) *> Task(codec.decode(bytes, protocol)).mapError(InternalError)
+      requireNonNull(bytes)
+      CodecRegistry.DEFAULT.codecFor(dataType, classOf[UdtValue]).decode(bytes, protocol)
     }
 
   implicit def rawReadsFromUdtReads[T: UdtReads]: RawReads[T] =
-    RawReads[UdtValue].flatMap(UdtReads[T].read(_).mapError(InternalError))
+    RawReads[UdtValue].map(UdtReads[T].read(_))
 
-  def checkNull(bytes: ByteBuffer): IO[UnexpectedNullError.type, Unit] =
-    ZIO.fail(UnexpectedNullError).when(bytes == null)
+  def requireNonNull(bytes: ByteBuffer): Unit = if (bytes == null) throw UnexpectedNullValue.NullValueInColumn
 
 }

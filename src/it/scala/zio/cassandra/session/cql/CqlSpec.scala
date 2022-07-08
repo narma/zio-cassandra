@@ -5,7 +5,7 @@ import zio.cassandra.session.Session
 import zio.cassandra.session.cql.codec.UnexpectedNullValue
 import zio.duration._
 import zio.stream.Stream
-import zio.test.Assertion.{ isLeft, isSubtype }
+import zio.test.Assertion._
 import zio.test.TestAspect.ignore
 import zio.test._
 import zio.{ Chunk, Has, RIO, ZIO }
@@ -49,6 +49,8 @@ object CqlSpec {
 
   case class TableContainingExampleNestedPrimitiveType(id: Int, data: ExampleNestedPrimitiveType)
 
+  case class TableContainingNestedType(id: Int, data: ExampleNestedType)
+
   locally {
     val _ = ignore // make compiler happy about unused import
   }
@@ -67,11 +69,13 @@ object CqlSpec {
     testM("interpolated select template should return tuples from migration") {
       for {
         prepared <- cqlt"select id, data, dataset FROM tests.test_data WHERE id in ${Put[List[Long]]}"
-          .as[(Long, String, Option[Set[Int]])]
-          .prepare
+                      .as[(Long, String, Option[Set[Int]])]
+                      .prepare
         query     = prepared(List[Long](1, 2, 3))
         results  <- query.select.runCollect
-      } yield assertTrue(results == Chunk((1L, "one", Some(Set.empty[Int])), (2L, "two", Some(Set(201))), (3L, "three", None)))
+      } yield assertTrue {
+        results == Chunk((1L, "one", Some(Set.empty[Int])), (2L, "two", Some(Set(201))), (3L, "three", None))
+      }
     },
     testM("interpolated select template should return tuples from migration with multiple binding") {
       for {
@@ -313,6 +317,19 @@ object CqlSpec {
           result <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
+      testM("render meaningful message in error") {
+        for {
+          result <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
+        } yield assert(result) {
+          isLeft {
+            hasMessage {
+              equalTo {
+                "Read NULL value from table [tests.test_data] in column [data], expected type [text]. Row: [id:0, data:NULL]"
+              }
+            }
+          }
+        }
+      },
       suite("handle NULL values with udt")(
         testM("return None when optional udt value is null") {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
@@ -383,7 +400,55 @@ object CqlSpec {
                         .selectFirst
                         .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
-        }
+        },
+        testM("render meaningful message in UDT error") {
+          val data =
+            PersonOptAttribute(
+              personAttributeIdxCounter.incrementAndGet(),
+              OptBasicInfo(None, Some("tall"), Some(Set(1)))
+            )
+
+          for {
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[PersonAttribute]
+                        .selectFirst
+                        .either
+          } yield assert(result) {
+            isLeft {
+              hasMessage {
+                equalTo {
+                  s"Read NULL value from table [tests.person_attributes] in UDT [info], type [tests.basic_info]. NULL value in field [weight], expected type [DOUBLE]. Row: [person_id:${data.personId}, info:{weight:NULL,height:'tall',datapoints:{1}}]"
+                }
+              }
+            }
+          }
+        },
+        testM("render meaningful message in nested UDT error") {
+          val data =
+            TableContainingNestedType(
+              0,
+              ExampleNestedType(0, "0", Some(ExampleType(0, 0, null, None)))
+            )
+
+          for {
+            _      <-
+              cql"INSERT INTO tests.nested_udt_table (id, data) VALUES (${data.id}, ${data.data})".execute
+            result <- cql"SELECT id, data FROM tests.nested_udt_table WHERE id = ${data.id}"
+              .as[TableContainingNestedType]
+              .selectFirst
+              .either
+          } yield assert(result) {
+            isLeft {
+              hasMessage {
+                equalTo {
+                  "Read NULL value from table [tests.nested_udt_table] in UDT [data], type [tests.example_nested_type]. NULL value in field [date], expected type [DATE]. Row: [id:0, data:{a:0,b:'0',c:{x:0,y:0,date:NULL,time:NULL}}]"
+                }
+              }
+            }
+          }
+        },
       )
     )
   )
