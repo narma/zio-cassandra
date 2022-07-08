@@ -51,7 +51,7 @@ object ReadsSpec extends CassandraSpecUtils {
       } yield assert(result)(hasSameElements(expected))
     },
     testM("should read names as is") {
-      implicit val configuration: Configuration = Configuration(identity)
+      implicit val configuration: Configuration = Configuration(identity(_))
 
       for {
         session <- ZIO.service[Session]
@@ -63,7 +63,7 @@ object ReadsSpec extends CassandraSpecUtils {
       } yield assertTrue(result.contains(nameTestData))
     },
     testM("should read names as is regardless of order in row") {
-      implicit val configuration: Configuration = Configuration(identity)
+      implicit val configuration: Configuration = Configuration(identity(_))
 
       for {
         session <- ZIO.service[Session]
