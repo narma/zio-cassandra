@@ -3,7 +3,6 @@ package zio.cassandra.session.cql.codec
 import com.datastax.oss.driver.api.core.ProtocolVersion
 import com.datastax.oss.driver.api.core.`type`.codec.TypeCodecs
 import com.datastax.oss.driver.api.core.`type`.codec.registry.CodecRegistry
-import com.datastax.oss.driver.api.core.`type`.reflect.GenericType
 import com.datastax.oss.driver.api.core.`type`.{ DataType, UserDefinedType }
 import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
@@ -13,7 +12,6 @@ import java.nio.ByteBuffer
 import java.time.{ Instant, LocalDate, LocalTime }
 import java.util.UUID
 import scala.jdk.CollectionConverters.{ MapHasAsJava, SeqHasAsJava, SetHasAsJava }
-import scala.reflect.{ classTag, ClassTag }
 
 /** Low-level alternative for [[com.datastax.oss.driver.api.core.type.codec.TypeCodec]] that is meant ot be resolved at
   * a compile-time.<br> Its main purpose is to provide a serializer for a single column value (regardless of if it's a
@@ -45,34 +43,26 @@ object RawWrites extends RawWritesInstances1 {
 
 trait RawWritesInstances1 extends RawWritesInstances2 {
 
-  implicit val stringRawWrites: RawWrites[String] = fromCodec[String]
+  implicit val stringRawWrites: RawWrites[String] = instance_(TypeCodecs.TEXT.encode)
 
-  // special case to (hopefully) avoid java boxing (same for other places)
   implicit val booleanRawWrites: RawWrites[Boolean] = instance_(TypeCodecs.BOOLEAN.encodePrimitive)
 
   implicit val shortRawWrites: RawWrites[Short]   = instance_(TypeCodecs.SMALLINT.encodePrimitive)
   implicit val intRawWrites: RawWrites[Int]       = instance_(TypeCodecs.INT.encodePrimitive)
   implicit val longRawWrites: RawWrites[Long]     = instance_(TypeCodecs.BIGINT.encodePrimitive)
-  implicit val bigIntRawWrites: RawWrites[BigInt] = fromCodec[java.math.BigInteger].contramap(_.bigInteger)
+  implicit val bigIntRawWrites: RawWrites[BigInt] = instance_(TypeCodecs.VARINT.encode).contramap(_.bigInteger)
 
   implicit val floatRawWrites: RawWrites[Float]           = instance_(TypeCodecs.FLOAT.encodePrimitive)
   implicit val doubleRawWrites: RawWrites[Double]         = instance_(TypeCodecs.DOUBLE.encodePrimitive)
-  implicit val bigDecimalRawWrites: RawWrites[BigDecimal] = fromCodec[java.math.BigDecimal].contramap(_.bigDecimal)
+  implicit val bigDecimalRawWrites: RawWrites[BigDecimal] = instance_(TypeCodecs.DECIMAL.encode).contramap(_.bigDecimal)
 
-  implicit val localDateRawWrites: RawWrites[LocalDate] = fromCodec[LocalDate]
-  implicit val localTimeRawWrites: RawWrites[LocalTime] = fromCodec[LocalTime]
-  implicit val instantRawWrites: RawWrites[Instant]     = fromCodec[Instant]
+  implicit val localDateRawWrites: RawWrites[LocalDate] = instance_(TypeCodecs.DATE.encode)
+  implicit val localTimeRawWrites: RawWrites[LocalTime] = instance_(TypeCodecs.TIME.encode)
+  implicit val instantRawWrites: RawWrites[Instant]     = instance_(TypeCodecs.TIMESTAMP.encode)
 
-  implicit val uuidRawWrites: RawWrites[UUID] = fromCodec[UUID]
+  implicit val uuidRawWrites: RawWrites[UUID] = instance_(TypeCodecs.UUID.encode)
 
-  implicit val byteBufferRawWrites: RawWrites[ByteBuffer] = fromCodec[ByteBuffer]
-
-  private def fromCodec[T: ClassTag]: RawWrites[T] = {
-    // might throw an exception, but we'd rather immediately die in this case
-    // do not inline it, otherwise this search will happen each time when reads is needed
-    val cachedCodec = codecRegistry.codecFor(classTag[T].runtimeClass.asInstanceOf[Class[T]])
-    instance_(cachedCodec.encode)
-  }
+  implicit val byteBufferRawWrites: RawWrites[ByteBuffer] = instance_(TypeCodecs.BLOB.encode)
 
   private def instance_[T](f: (T, ProtocolVersion) => ByteBuffer): RawWrites[T] =
     instance((t, p) => f(t, p))
@@ -87,7 +77,7 @@ trait RawWritesInstances2 extends RawWritesInstances3 {
     }
 
   implicit def iterableRawWrites[T: RawWrites, Coll[E] <: Iterable[E]]: RawWrites[Coll[T]] = {
-    val cachedCodec = codecRegistry.codecFor(GenericType.listOf(classOf[ByteBuffer]))
+    val cachedCodec = TypeCodecs.listOf(TypeCodecs.BLOB)
     instance { (tColl, protocol, dataType) =>
       val listType    = dataType.asInstanceOf[DefaultListType]
       val listElType  = listType.getElementType
@@ -97,7 +87,7 @@ trait RawWritesInstances2 extends RawWritesInstances3 {
   }
 
   implicit def setRawWrites[T: RawWrites]: RawWrites[Set[T]] = {
-    val cachedCodec = codecRegistry.codecFor(GenericType.setOf(classOf[ByteBuffer]))
+    val cachedCodec = TypeCodecs.setOf(TypeCodecs.BLOB)
     instance { (tSet, protocol, dataType) =>
       val setType    = dataType.asInstanceOf[DefaultSetType]
       val setElType  = setType.getElementType
@@ -107,7 +97,7 @@ trait RawWritesInstances2 extends RawWritesInstances3 {
   }
 
   implicit def mapRawReads[K: RawWrites, V: RawWrites]: RawWrites[Map[K, V]] = {
-    val cachedCodec = codecRegistry.codecFor(GenericType.mapOf(classOf[ByteBuffer], classOf[ByteBuffer]))
+    val cachedCodec = TypeCodecs.mapOf(TypeCodecs.BLOB, TypeCodecs.BLOB)
     instance { (tMap, protocol, dataType) =>
       val mapType    = dataType.asInstanceOf[DefaultMapType]
       val keyType    = mapType.getKeyType
@@ -125,11 +115,9 @@ trait RawWritesInstances2 extends RawWritesInstances3 {
 
 trait RawWritesInstances3 {
 
-  protected val codecRegistry: CodecRegistry = CodecRegistry.DEFAULT
-
   implicit val udtValueRawWrites: RawWrites[UdtValue] =
     instance { (udt, protocol, dataType) =>
-      val codec = codecRegistry.codecFor(dataType, classOf[UdtValue])
+      val codec = CodecRegistry.DEFAULT.codecFor(dataType, classOf[UdtValue])
       codec.encode(udt, protocol)
     }
 
