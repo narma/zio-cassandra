@@ -17,6 +17,8 @@ object ReadsSpec extends CassandraSpecUtils {
     datamap: Option[Map[Int, String]]
   )
 
+  final case class ChunkTestData(id: BigInt, datalist: Chunk[Int])
+
   final case class NameTestData(id: BigInt, ALLUPPER: String, alllower: String, someName: String, someLongName: String)
 
   final case class NullableCollectionsTestData(id: Int, regularList: Seq[Int], frozenList: Seq[Int])
@@ -47,6 +49,17 @@ object ReadsSpec extends CassandraSpecUtils {
         result  <- session
                      .select(s"select id, data, count, flag, dataset, datalist, datamap FROM $keyspace.reads_type_test")
                      .mapM(read[TypeTestData](_))
+                     .runCollect
+      } yield assert(result)(hasSameElements(expected))
+    },
+    testM("should read cassandra lists as chunks") {
+      val expected = Chunk(ChunkTestData(2, Chunk(210)), ChunkTestData(3, Chunk(310, 311, 312)))
+
+      for {
+        session <- ZIO.service[Session]
+        result  <- session
+                     .select(s"select id, datalist FROM $keyspace.reads_type_test where id in (2, 3)")
+                     .mapM(read[ChunkTestData](_))
                      .runCollect
       } yield assert(result)(hasSameElements(expected))
     },
