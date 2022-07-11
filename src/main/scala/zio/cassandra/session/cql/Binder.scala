@@ -3,7 +3,7 @@ package zio.cassandra.session.cql
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.data.{ SettableByIndex, UdtValue }
 import shapeless.{ ::, HList, HNil, Widen }
-import zio.cassandra.session.cql.codec.RawWrites
+import zio.cassandra.session.cql.codec.CellWrites
 
 import scala.annotation.implicitNotFound
 
@@ -68,13 +68,13 @@ trait BinderLowerPriority {
 
   /** This typeclass instance is used to (inductively) derive datatypes that can have arbitrary amounts of nesting
     * @param writes
-    *   is evidence that a typeclass instance of RawWrites exists for A
+    *   is evidence that a typeclass instance of CellWrites exists for A
     * @tparam T
     *   is the Scala datatype that needs to be written to Cassandra
     * @return
     */
 
-  implicit def deriveBinderFromRawWrites[T](implicit writes: RawWrites[T]): Binder[T] = new Binder[T] {
+  implicit def deriveBinderFromCellWrites[T](implicit writes: CellWrites[T]): Binder[T] = new Binder[T] {
     override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: T): S = {
       val protocol = statement.protocolVersion()
       val dataType = statement.getType(index)

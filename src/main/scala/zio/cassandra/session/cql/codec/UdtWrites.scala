@@ -7,8 +7,8 @@ import zio.cassandra.session.cql.codec.UdtWrites._
 
 /** Serializer created specifically for UDT values.<br> Note that this reader can be (is) recursive, so each instance of
   * [[zio.cassandra.session.cql.codec.UdtWrites]] can be seen as an instance of
-  * [[zio.cassandra.session.cql.codec.RawWrites]], while at the same time it might need
-  * [[zio.cassandra.session.cql.codec.RawWrites]] instances to work.<br>
+  * [[zio.cassandra.session.cql.codec.CellWrites]], while at the same time it might need
+  * [[zio.cassandra.session.cql.codec.CellWrites]] instances to work.<br>
   *
   * The reason why it needs `structure: UdtValue` param is because we cannot create an `UdtValue` out of thin air,
   * we can only fill it with values. The only one who can properly create an UdtValue is java driver, so it's up to a
@@ -34,7 +34,7 @@ trait UdtWritesInstances1 {
   implicit val hNilUdtWrites: UdtWrites[HNil] = instance((_, udtValue) => udtValue)
 
   implicit def hConsUdtWrites[K <: Symbol, H, T <: HList](implicit
-    hWrites: Lazy[RawWrites[H]],
+    hWrites: Lazy[CellWrites[H]],
     tWrites: UdtWrites[T],
     fieldNameW: Witness.Aux[K]
   ): UdtWrites[FieldType[K, H] :: T] =

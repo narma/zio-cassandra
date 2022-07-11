@@ -9,8 +9,8 @@ import scala.annotation.nowarn
 
 /** Deserializer created specifically for UDT values.<br> Note that unlike [[zio.cassandra.session.cql.codec.Reads]],
   * this reader can be (is) recursive, so each instance of [[zio.cassandra.session.cql.codec.UdtReads]] can be seen as
-  * an instance of [[zio.cassandra.session.cql.codec.RawReads]], while at the same time it might need
-  * [[zio.cassandra.session.cql.codec.RawReads]] instances to work.
+  * an instance of [[zio.cassandra.session.cql.codec.CellReads]], while at the same time it might need
+  * [[zio.cassandra.session.cql.codec.CellReads]] instances to work.
   */
 trait UdtReads[T] {
 
@@ -32,7 +32,7 @@ trait UdtReadsInstances1 {
 
   implicit def hConsUdtReads[K <: Symbol, H, T <: HList](implicit
     configuration: Configuration,
-    hReads: Lazy[RawReads[H]],
+    hReads: Lazy[CellReads[H]],
     tReads: UdtReads[T],
     fieldNameW: Witness.Aux[K]
   ): UdtReads[FieldType[K, H] :: T] =

@@ -8,7 +8,7 @@ import zio.cassandra.session.cql.codec.Reads.instance
 import scala.annotation.nowarn
 
 /** The main typeclass for decoding Cassandra values, the only one that matters. <br>
-  * [[zio.cassandra.session.cql.codec.RawReads]] and [[zio.cassandra.session.cql.codec.UdtReads]] are mostly an
+  * [[zio.cassandra.session.cql.codec.CellReads]] and [[zio.cassandra.session.cql.codec.UdtReads]] are mostly an
   * implementation details. As long as you can provide and instance of [[zio.cassandra.session.cql.codec.Reads]] for
   * your class (regardless of how you've created it), everything should work just fine.
   */
@@ -31,7 +31,7 @@ trait ReadsInstances1 extends ReadsInstances2 {
   implicit val rowReads: Reads[Row] = instance(identity)
 
   implicit def tuple1Reads[
-    T1: RawReads
+    T1: CellReads
   ]: Reads[Tuple1[T1]] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -39,8 +39,8 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple2Reads[
-    T1: RawReads,
-    T2: RawReads
+    T1: CellReads,
+    T2: CellReads
   ]: Reads[(T1, T2)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -49,9 +49,9 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple3Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads
   ]: Reads[(T1, T2, T3)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -61,10 +61,10 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple4Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads
   ]: Reads[(T1, T2, T3, T4)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -75,11 +75,11 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple5Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads
   ]: Reads[(T1, T2, T3, T4, T5)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -91,12 +91,12 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple6Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -109,13 +109,13 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple7Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -129,14 +129,14 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple8Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -151,15 +151,15 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple9Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9)] =
     instance { row =>
       val t1 = readByIndex[T1](row, 0)
@@ -175,16 +175,16 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple10Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -201,17 +201,17 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple11Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -229,18 +229,18 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple12Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -259,19 +259,19 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple13Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -291,20 +291,20 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple14Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -325,21 +325,21 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple15Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -361,22 +361,22 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple16Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -399,23 +399,23 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple17Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads,
-    T17: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads,
+    T17: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -439,24 +439,24 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple18Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads,
-    T17: RawReads,
-    T18: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads,
+    T17: CellReads,
+    T18: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -481,25 +481,25 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple19Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads,
-    T17: RawReads,
-    T18: RawReads,
-    T19: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads,
+    T17: CellReads,
+    T18: CellReads,
+    T19: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -525,26 +525,26 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple20Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads,
-    T17: RawReads,
-    T18: RawReads,
-    T19: RawReads,
-    T20: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads,
+    T17: CellReads,
+    T18: CellReads,
+    T19: CellReads,
+    T20: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -571,27 +571,27 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple21Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads,
-    T17: RawReads,
-    T18: RawReads,
-    T19: RawReads,
-    T20: RawReads,
-    T21: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads,
+    T17: CellReads,
+    T18: CellReads,
+    T19: CellReads,
+    T20: CellReads,
+    T21: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -619,28 +619,28 @@ trait ReadsInstances1 extends ReadsInstances2 {
     }
 
   implicit def tuple22Reads[
-    T1: RawReads,
-    T2: RawReads,
-    T3: RawReads,
-    T4: RawReads,
-    T5: RawReads,
-    T6: RawReads,
-    T7: RawReads,
-    T8: RawReads,
-    T9: RawReads,
-    T10: RawReads,
-    T11: RawReads,
-    T12: RawReads,
-    T13: RawReads,
-    T14: RawReads,
-    T15: RawReads,
-    T16: RawReads,
-    T17: RawReads,
-    T18: RawReads,
-    T19: RawReads,
-    T20: RawReads,
-    T21: RawReads,
-    T22: RawReads
+    T1: CellReads,
+    T2: CellReads,
+    T3: CellReads,
+    T4: CellReads,
+    T5: CellReads,
+    T6: CellReads,
+    T7: CellReads,
+    T8: CellReads,
+    T9: CellReads,
+    T10: CellReads,
+    T11: CellReads,
+    T12: CellReads,
+    T13: CellReads,
+    T14: CellReads,
+    T15: CellReads,
+    T16: CellReads,
+    T17: CellReads,
+    T18: CellReads,
+    T19: CellReads,
+    T20: CellReads,
+    T21: CellReads,
+    T22: CellReads
   ]: Reads[(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T20, T21, T22)] =
     instance { row =>
       val t1  = readByIndex[T1](row, 0)
@@ -676,7 +676,7 @@ trait ReadsInstances2 extends ReadsInstances3 {
 
   implicit def hConsReads[K <: Symbol, H, T <: HList](implicit
     configuration: Configuration,
-    hReads: RawReads[H],
+    hReads: CellReads[H],
     tReads: Reads[T],
     fieldNameW: Witness.Aux[K]
   ): Reads[FieldType[K, H] :: T] =
@@ -712,10 +712,10 @@ trait ReadsInstances3 {
       throw UnexpectedNullValueInUdt(row, columnDefinition, udt, udtFieldName)
   }
 
-  implicit def readsFromRawReads[T: RawReads]: Reads[T] = instance(readByIndex(_, 0))
+  implicit def readsFromCellReads[T: CellReads]: Reads[T] = instance(readByIndex(_, 0))
 
-  protected def readByIndex[T: RawReads](row: Row, index: Int): T =
-    try RawReads[T].read(row.getBytesUnsafe(index), row.protocolVersion(), row.getType(index))
+  protected def readByIndex[T: CellReads](row: Row, index: Int): T =
+    try CellReads[T].read(row.getBytesUnsafe(index), row.protocolVersion(), row.getType(index))
     catch refineError(row, row.getColumnDefinitions.get(index))
 
 }
