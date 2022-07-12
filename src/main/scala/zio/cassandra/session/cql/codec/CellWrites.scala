@@ -13,7 +13,7 @@ import java.time.{ Instant, LocalDate, LocalTime }
 import java.util.UUID
 import scala.jdk.CollectionConverters.{ MapHasAsJava, SeqHasAsJava, SetHasAsJava }
 
-/** Low-level alternative for [[com.datastax.oss.driver.api.core.type.codec.TypeCodec]] that is meant ot be resolved at
+/** Low-level alternative for `com.datastax.oss.driver.api.core.type.codec.TypeCodec` that is meant ot be resolved at
   * a compile-time.<br> Its main purpose is to provide a serializer for a single column value (regardless of if it's a
   * primitive type or an UDT).
   */
