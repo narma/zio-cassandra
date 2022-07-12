@@ -2,14 +2,15 @@ package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
 import zio.cassandra.session.Session
+import zio.cassandra.session.cql.codec.UnexpectedNullValue
 import zio.duration._
 import zio.stream.Stream
-import zio.test.Assertion.{isLeft, isSubtype}
+import zio.test.Assertion._
 import zio.test.TestAspect.ignore
 import zio.test._
-import zio.{Chunk, Has, RIO, ZIO}
+import zio.{ Chunk, Has, RIO, ZIO }
 
-import java.time.{LocalDate, LocalTime}
+import java.time.{ LocalDate, LocalTime }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -19,10 +20,6 @@ object CqlSpec {
   case class OptData(id: Long, data: Option[String])
 
   case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
-  object BasicInfo {
-    implicit val cqlReads: Reads[BasicInfo]   = FromUdtValue.deriveReads[BasicInfo]
-    implicit val cqlBinder: Binder[BasicInfo] = ToUdtValue.deriveBinder[BasicInfo]
-  }
 
   val personAttributeIdxCounter = new AtomicInteger(0)
 
@@ -30,10 +27,6 @@ object CqlSpec {
   case class OptPersonAttribute(personId: Int, info: Option[BasicInfo])
 
   case class OptBasicInfo(weight: Option[Double], height: Option[String], datapoints: Option[Set[Int]])
-  object OptBasicInfo {
-    implicit val cqlReads: Reads[OptBasicInfo]   = FromUdtValue.deriveReads[OptBasicInfo]
-    implicit val cqlBinder: Binder[OptBasicInfo] = ToUdtValue.deriveBinder[OptBasicInfo]
-  }
 
   case class PersonOptAttribute(personId: Int, info: OptBasicInfo)
 
@@ -49,26 +42,14 @@ object CqlSpec {
   case class ExampleNestedType(a: Int, b: String, c: Option[ExampleType])
 
   case class ExampleCollectionNestedUdtType(a: Int, b: Map[Int, Set[Set[Set[Set[ExampleNestedType]]]]])
-  object ExampleCollectionNestedUdtType {
-    implicit val binderExampleCollectionNestedUdtType: Binder[ExampleCollectionNestedUdtType] =
-      ToUdtValue.deriveBinder[ExampleCollectionNestedUdtType]
-
-    implicit val readsExampleCollectionNestedUdtType: Reads[ExampleCollectionNestedUdtType] =
-      FromUdtValue.deriveReads[ExampleCollectionNestedUdtType]
-  }
 
   case class ExampleNestedPrimitiveType(a: Int, b: Map[Int, Set[Set[Set[Set[Int]]]]])
-  object ExampleNestedPrimitiveType {
-    implicit val binderExampleNestedPrimitiveType: Binder[ExampleNestedPrimitiveType] =
-      ToUdtValue.deriveBinder[ExampleNestedPrimitiveType]
-
-    implicit val readsExampleNestedPrimitiveType: Reads[ExampleNestedPrimitiveType] =
-      FromUdtValue.deriveReads[ExampleNestedPrimitiveType]
-  }
 
   case class TableContainingExampleCollectionNestedUdtType(id: Int, data: ExampleCollectionNestedUdtType)
 
   case class TableContainingExampleNestedPrimitiveType(id: Int, data: ExampleNestedPrimitiveType)
+
+  case class TableContainingNestedType(id: Int, data: ExampleNestedType)
 
   locally {
     val _ = ignore // make compiler happy about unused import
@@ -84,6 +65,17 @@ object CqlSpec {
         query     = prepared(List[Long](1, 2, 3))
         results  <- query.select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
+    },
+    testM("interpolated select template should return tuples from migration") {
+      for {
+        prepared <- cqlt"select id, data, dataset FROM tests.test_data WHERE id in ${Put[List[Long]]}"
+                      .as[(Long, String, Option[Set[Int]])]
+                      .prepare
+        query     = prepared(List[Long](1, 2, 3))
+        results  <- query.select.runCollect
+      } yield assertTrue {
+        results == Chunk((1L, "one", Some(Set.empty[Int])), (2L, "two", Some(Set(201))), (3L, "three", None))
+      }
     },
     testM("interpolated select template should return tuples from migration with multiple binding") {
       for {
@@ -113,8 +105,8 @@ object CqlSpec {
     },
     testM("interpolated select template should be reusable") {
       for {
-        query   <- cqlt"select data FROM tests.test_data WHERE id = ${Put[Long]}".as[String].prepare
-        result  <- Stream.fromIterable(Seq(1L, 2L, 3L)).flatMap(i => query(i).select).runCollect
+        query  <- cqlt"select data FROM tests.test_data WHERE id = ${Put[Long]}".as[String].prepare
+        result <- Stream.fromIterable(Seq(1L, 2L, 3L)).flatMap(i => query(i).select).runCollect
       } yield assertTrue(result == Chunk("one", "two", "three"))
     },
     testM("interpolated select should return data from migration") {
@@ -162,12 +154,11 @@ object CqlSpec {
         PersonAttribute(personAttributeIdxCounter.incrementAndGet(), BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
 
       for {
-        _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                     .execute
-        result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                     .as[PersonAttribute]
-                     .select
-                     .runCollect
+        _      <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+        result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                    .as[PersonAttribute]
+                    .select
+                    .runCollect
       } yield assertTrue(result.length == 1 && result.head == data)
     },
     testM("interpolated inserts and selects should handle cassandra collections") {
@@ -175,8 +166,7 @@ object CqlSpec {
       val dataRow2 = CollectionTestRow(2, Map("3" -> UUID.randomUUID()), Set(4, 5, 6), None)
 
       def insert(data: CollectionTestRow): RIO[Has[Session], Boolean] =
-        cql"INSERT INTO tests.test_collection (id, maptest, settest, listtest) VALUES (${data.id}, ${data.maptest}, ${data.settest}, ${data.listtest})"
-          .execute
+        cql"INSERT INTO tests.test_collection (id, maptest, settest, listtest) VALUES (${data.id}, ${data.maptest}, ${data.settest}, ${data.listtest})".execute
 
       def retrieve(id: Int, ids: Int*): RIO[Has[Session], Chunk[CollectionTestRow]] = {
         val allIds = id :: ids.toList
@@ -187,9 +177,9 @@ object CqlSpec {
       }
 
       for {
-        _       <- ZIO.foreachPar_(List(dataRow1, dataRow2))(insert)
-        res1    <- retrieve(dataRow1.id)
-        res2    <- retrieve(dataRow2.id)
+        _    <- ZIO.foreachPar_(List(dataRow1, dataRow2))(insert)
+        res1 <- retrieve(dataRow1.id)
+        res2 <- retrieve(dataRow2.id)
       } yield assertTrue(res1.length == 1 && res1.head == dataRow1) && assertTrue(
         res2.length == 1 && res2.head == dataRow2
       )
@@ -244,15 +234,15 @@ object CqlSpec {
       )
 
       for {
-        _       <- cql"INSERT INTO tests.heavily_nested_udt_table (id, data) VALUES (${row.id}, ${row.data})".execute
-        actual  <- cql"SELECT id, data FROM tests.heavily_nested_udt_table WHERE id = ${row.id}"
-                     .as[TableContainingExampleCollectionNestedUdtType]
-                     .select
-                     .runCollect
+        _      <- cql"INSERT INTO tests.heavily_nested_udt_table (id, data) VALUES (${row.id}, ${row.data})".execute
+        actual <- cql"SELECT id, data FROM tests.heavily_nested_udt_table WHERE id = ${row.id}"
+                    .as[TableContainingExampleCollectionNestedUdtType]
+                    .select
+                    .runCollect
       } yield assertTrue(actual.length == 1 && actual.head == row)
     },
     testM("interpolated inserts and selects should handle UDTs and primitives in heavily nested collections") {
-      val row                      = TableContainingExampleNestedPrimitiveType(
+      val row    = TableContainingExampleNestedPrimitiveType(
         id = 1,
         data = ExampleNestedPrimitiveType(
           a = 1,
@@ -271,14 +261,14 @@ object CqlSpec {
         .runCollect
 
       for {
-        _       <- insert
-        actual  <- retrieve
+        _      <- insert
+        actual <- retrieve
       } yield assertTrue(actual.length == 1 && actual.head == row)
     },
     testM("interpolated select should bind constants") {
       val query = cql"select data FROM tests.test_data WHERE id = ${1L}".as[String]
       for {
-        result  <- query.select.runCollect
+        result <- query.select.runCollect
       } yield assertTrue(result == Chunk("one"))
     },
     testM("cqlConst allows you to interpolate on what is usually not possible with cql strings") {
@@ -294,68 +284,75 @@ object CqlSpec {
         cql" WHERE person_id = $personId"
 
       def insert(data: PersonAttribute) =
-        (cql"INSERT INTO " ++ keyspace ++ table ++ cql" (person_id, info) VALUES (${data.personId}, ${data.info})")
-          .execute
+        (cql"INSERT INTO " ++ keyspace ++ table ++ cql" (person_id, info) VALUES (${data.personId}, ${data.info})").execute
 
       for {
-        _       <- insert(data)
-        result  <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst
+        _      <- insert(data)
+        result <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst
       } yield assertTrue(result.isDefined && result.get == data)
     },
     suite("handle NULL values")(
-      testM("return None for Option[String") {
+      testM("return None for Option[String]") {
         for {
-          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst
+          result <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst
         } yield assertTrue(result.isDefined && result.get.isEmpty)
       },
-      testM("raise error for String(nin-primitive)") {
+      testM("raise error for String(non-primitive)") {
         for {
-          result  <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst.either
+          result <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
       testM("raise error for Int(primitive)") {
         for {
-          result  <- cql"select count FROM tests.test_data WHERE id = 0".as[Int].selectFirst.either
-        } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
-      },
-      testM("raise error for Set(collection)") {
-        for {
-          result  <- cql"select dataset FROM tests.test_data WHERE id = 0".as[Set[Int]].selectFirst.either
+          result <- cql"select count FROM tests.test_data WHERE id = 0".as[Int].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
       testM("return value for field in case class have Option type") {
         for {
-          row     <- cql"select id, data FROM tests.test_data WHERE id = 0".as[OptData].selectFirst
+          row <- cql"select id, data FROM tests.test_data WHERE id = 0".as[OptData].selectFirst
         } yield assertTrue(row.isDefined && row.get.data.isEmpty)
       },
       testM("raise error if field in case class have Option type") {
         for {
-          result  <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
+          result <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
+      },
+      testM("render meaningful message in error") {
+        for {
+          result <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
+        } yield assert(result) {
+          isLeft {
+            hasMessage {
+              equalTo {
+                "Read NULL value from table [tests.test_data] in column [data], expected type [text]. Row: [id:0, data:NULL]"
+              }
+            }
+          }
+        }
       },
       suite("handle NULL values with udt")(
         testM("return None when optional udt value is null") {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
 
           for {
-            _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[OptPersonAttribute]
-                         .select
-                         .runCollect
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[OptPersonAttribute]
+                        .select
+                        .runCollect
           } yield assertTrue(result.length == 1 && result.head == data)
         },
         testM("raise error when non-optional udt value is null") {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
 
           for {
-            _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonAttribute]
-                         .selectFirst
-                         .either
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[PersonAttribute]
+                        .selectFirst
+                        .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
         testM("return None when udt field value is null for optional type") {
@@ -365,11 +362,11 @@ object CqlSpec {
           )
 
           for {
-            _       <- cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                         .execute
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonOptAttribute]
-                         .selectFirst
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[PersonOptAttribute]
+                        .selectFirst
           } yield assertTrue(result.contains(data))
         },
         testM("raise error if udt field value is mapped to String(non-primitive)") {
@@ -380,13 +377,12 @@ object CqlSpec {
             )
 
           for {
-            _       <-
-              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                .execute
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonAttribute]
-                         .selectFirst
-                         .either
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[PersonAttribute]
+                        .selectFirst
+                        .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
         testM("raise error if udt field value is mapped to Double(primitive)") {
@@ -397,32 +393,62 @@ object CqlSpec {
             )
 
           for {
-            _       <-
-              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                .execute
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonAttribute]
-                         .selectFirst
-                         .either
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[PersonAttribute]
+                        .selectFirst
+                        .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
-        testM("raise error if udt field value is mapped to Double(primitive)") {
+        testM("render meaningful message in UDT error") {
           val data =
             PersonOptAttribute(
               personAttributeIdxCounter.incrementAndGet(),
-              OptBasicInfo(Some(160.0), Some("tall"), None)
+              OptBasicInfo(None, Some("tall"), Some(Set(1)))
             )
 
           for {
-            _       <-
-              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-                .execute
-            result  <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
-                         .as[PersonAttribute]
-                         .selectFirst
-                         .either
-          } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
-        }
+            _      <-
+              cql"INSERT INTO tests.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})".execute
+            result <- cql"SELECT person_id, info FROM tests.person_attributes WHERE person_id = ${data.personId}"
+                        .as[PersonAttribute]
+                        .selectFirst
+                        .either
+          } yield assert(result) {
+            isLeft {
+              hasMessage {
+                equalTo {
+                  s"Read NULL value from table [tests.person_attributes] in UDT [info], type [tests.basic_info]. NULL value in field [weight], expected type [DOUBLE]. Row: [person_id:${data.personId}, info:{weight:NULL,height:'tall',datapoints:{1}}]"
+                }
+              }
+            }
+          }
+        },
+        testM("render meaningful message in nested UDT error") {
+          val data =
+            TableContainingNestedType(
+              0,
+              ExampleNestedType(0, "0", Some(ExampleType(0, 0, null, None)))
+            )
+
+          for {
+            _      <-
+              cql"INSERT INTO tests.nested_udt_table (id, data) VALUES (${data.id}, ${data.data})".execute
+            result <- cql"SELECT id, data FROM tests.nested_udt_table WHERE id = ${data.id}"
+              .as[TableContainingNestedType]
+              .selectFirst
+              .either
+          } yield assert(result) {
+            isLeft {
+              hasMessage {
+                equalTo {
+                  "Read NULL value from table [tests.nested_udt_table] in UDT [data], type [tests.example_nested_type]. NULL value in field [date], expected type [DATE]. Row: [id:0, data:{a:0,b:'0',c:{x:0,y:0,date:NULL,time:NULL}}]"
+                }
+              }
+            }
+          }
+        },
       )
     )
   )
