@@ -14,7 +14,7 @@ import java.util.UUID
 import scala.collection.Factory
 import scala.jdk.CollectionConverters.{ IterableHasAsScala, MapHasAsScala, SetHasAsScala }
 
-/** Low-level alternative for [[com.datastax.oss.driver.api.core.type.codec.TypeCodec]] that is meant ot be resolved at
+/** Low-level alternative for `com.datastax.oss.driver.api.core.type.codec.TypeCodec` that is meant ot be resolved at
   * a compile-time.<br> Its main purpose is to provide a deserializer for a single column value (regardless of if it's a
   * primitive type or an UDT).
   */
