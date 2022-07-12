@@ -24,6 +24,31 @@ object Reads extends ReadsInstances1 {
 
   def instance[T](f: Row => T): Reads[T] = (row: Row) => f(row)
 
+  /** Useful when you want to "cache" [[zio.cassandra.session.cql.codec.Reads]] instance (e.g. to decrease compilation
+    * time or make sure it captures the correct [[zio.cassandra.session.cql.codec.Configuration]])
+    *
+    * Example:
+    * {{{
+    * final case class Foo(a: Int, b: String)
+    *
+    * // somewhere else
+    * implicit val configuration: Configuration = {
+    *   val renameFields: String => String = {
+    *     case "a"   => "some_other_name"
+    *     case other => Configuration.snakeCaseTransformation(other)
+    *     }
+    *   Configuration(renameFields)
+    * }
+    *
+    * implicit val reads: Reads[Foo] = Reads.derive
+    * }}}
+    */
+  def derive[T, Repr](implicit
+    configuration: Configuration,
+    gen: LabelledGeneric.Aux[T, Repr],
+    reads: Reads[Repr]
+  ): Reads[T] = genericReads
+
 }
 
 trait ReadsInstances1 extends ReadsInstances2 {
