@@ -6,13 +6,13 @@ import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException
 import com.dimafeng.testcontainers.CassandraContainer
 import zio.test.Assertion._
 import zio.test._
-import zio.{ Chunk, ZIO }
+import zio.{ Chunk, Scope, ZIO }
 
 import java.net.InetSocketAddress
 
-object SessionSpec extends CassandraSpecUtils {
+object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
 
-  val sessionTests = suite("Cassandra session")(
+  val spec: Spec[Scope with CassandraContainer with Session, Throwable] = suite("Cassandra session")(
     test("Session.make must be referentially transparent") {
       val st = SimpleStatement.newInstance(s"select cluster_name from system.local")
       for {

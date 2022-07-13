@@ -1,11 +1,11 @@
 package zio.cassandra.session.cql.codec
 
 import zio.{ Chunk, ZIO }
-import zio.cassandra.session.{ CassandraSpecUtils, Session }
+import zio.cassandra.session.{ Session, ZIOCassandraSpec, ZIOCassandraSpecUtils }
 import zio.test.Assertion.hasSameElements
 import zio.test._
 
-object UdtReadsSpec extends CassandraSpecUtils {
+object UdtReadsSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
 
   final case class UdtTypeTestData(
     data: String,
@@ -24,7 +24,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
 
   private val nameTestData = NameTestData(0, UdtNameTestData("ALL-UPPER", "all-lower", "some-name", "some-long-name"))
 
-  val readsTests = suite("UdtReads")(
+  val spec: Spec[Session, Throwable] = suite("UdtReads")(
     test("should read simple data types") {
       val expected =
         Chunk(

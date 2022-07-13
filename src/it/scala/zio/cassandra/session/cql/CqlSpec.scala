@@ -1,7 +1,7 @@
 package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
-import zio.cassandra.session.Session
+import zio.cassandra.session.{ Session, ZIOCassandraSpec }
 import zio.cassandra.session.cql.codec.UnexpectedNullValue
 import zio.stream.ZStream
 import zio.test.Assertion._
@@ -13,7 +13,7 @@ import java.time.{ LocalDate, LocalTime }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
-object CqlSpec {
+object CqlSpec extends ZIOCassandraSpec {
 
   case class Data(id: Long, data: String)
   case class OptData(id: Long, data: Option[String])
@@ -54,7 +54,7 @@ object CqlSpec {
     val _ = ignore // make compiler happy about unused import
   }
 
-  val cqlSuite = suite("cql suite")(
+  val spec: Spec[Session, Throwable] = suite("cql suite")(
     test("interpolated select template should return data from migration") {
       for {
         prepared <- cqlt"select data FROM tests.test_data WHERE id in ${Put[List[Long]]}"

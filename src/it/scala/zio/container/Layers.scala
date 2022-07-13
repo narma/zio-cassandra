@@ -8,16 +8,16 @@ import com.typesafe.config.ConfigFactory
 import zio._
 import zio.cassandra.session.Session
 import zio.stream._
-import zio.test.{ TestFailure, ZIOSpec }
+import zio.test.TestFailure
 
 import java.net.InetSocketAddress
 import scala.jdk.CollectionConverters.IterableHasAsJava
 
-trait TestsSharedInstances { self: ZIOSpec[_] =>
+object Layers {
 
-  val keyspace = "tests"
+  private val keyspace = "tests"
 
-  def migrateSession(session: Session): Task[Unit] = {
+  private def migrateSession(session: Session): Task[Unit] = {
     val migrations = ZStream
       .fromResource("migration/1__test_tables.cql")
       .via(ZPipeline.utf8Decode >>> ZPipeline.splitLines)
@@ -42,7 +42,7 @@ trait TestsSharedInstances { self: ZIOSpec[_] =>
     } yield ()
   }
 
-  def ensureKeyspaceExists(builder: CqlSessionBuilder): Task[Unit] =
+  private def ensureKeyspaceExists(builder: CqlSessionBuilder): Task[Unit] =
     for {
       session <- ZIO.fromCompletionStage(builder.withKeyspace(Option.empty[String].orNull).buildAsync())
       _       <-
