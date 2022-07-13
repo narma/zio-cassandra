@@ -12,7 +12,7 @@ abstract class ZIOCassandraSpec extends ZIOSpec[CassandraContainer with Session]
   Logger.setDefaultFormatter(LogFormatter.SourceCodeLogFormatter)
   Logger.scanLogLevels
 
-  override val bootstrap: ZLayer[Scope, Any, Environment] = Layers.layer
+  override val bootstrap: ZLayer[Any, Any, Environment] = Layers.layer
 
   def spec: Spec[Environment with TestEnvironment with Scope, Any]
 

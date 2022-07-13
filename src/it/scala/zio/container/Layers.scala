@@ -8,7 +8,6 @@ import com.typesafe.config.ConfigFactory
 import zio._
 import zio.cassandra.session.Session
 import zio.stream._
-import zio.test.TestFailure
 
 import java.net.InetSocketAddress
 import scala.jdk.CollectionConverters.IterableHasAsJava
@@ -56,10 +55,10 @@ object Layers {
       _       <- ZIO.fromCompletionStage(session.closeAsync())
     } yield ()
 
-  val layerCassandra: ZLayer[Scope, TestFailure[Nothing], CassandraContainer] = ZTestContainer.cassandra
+  val layerCassandra: ZLayer[Any, Throwable, CassandraContainer] = ZTestContainer.cassandra
 
-  val layerSession: ZLayer[Scope with CassandraContainer, TestFailure[Nothing], Session] =
-    ZLayer.fromZIO {
+  val layerSession: ZLayer[CassandraContainer, Throwable, Session] =
+    ZLayer.scoped {
       for {
         cassandra <- ZIO.service[CassandraContainer]
         address    = new InetSocketAddress(cassandra.containerIpAddress, cassandra.mappedPort(9042))
@@ -75,9 +74,9 @@ object Layers {
         session <- Session.make(builder)
         _       <- migrateSession(session)
       } yield session
-    }.mapError(TestFailure.die)
+    }
 
-  val layer: ZLayer[Scope, TestFailure[Nothing], CassandraContainer with Session] =
-    ZLayer.environment[Scope] >+> layerCassandra >+> layerSession
+  val layer: ZLayer[Any, Throwable, CassandraContainer with Session] =
+    layerCassandra >+> layerSession
 
 }
