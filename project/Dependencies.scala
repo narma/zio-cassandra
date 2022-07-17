@@ -1,19 +1,22 @@
 import sbt._
+import sbt.librarymanagement.CrossVersion
 
 object Dependencies {
 
-  val cassandraDriverVersion = "4.14.0"
+  object V {
+    val scala2    = "2.13.8"
+    val scala3    = "3.1.3"
+    val allScala  = Seq(scala2, scala3)
+  }
 
-  val zioVersion = "1.0.13"
+  val cassandraDriverVersion = "4.14.1"
 
-  val testContainersVersion = "0.40.2"
+  val zioVersion = "1.0.16"
+
+  val testContainersVersion = "0.40.8"
 
   val cassandraDependencies = Seq(
     "com.datastax.oss" % "java-driver-core" % cassandraDriverVersion
-  )
-
-  val commonDependencies = Seq(
-    "com.chuusai" %% "shapeless" % "2.3.8"
   )
 
   val zioDependencies = Seq(
@@ -27,11 +30,11 @@ object Dependencies {
   ).map(_ % "it,test")
 
   val testIntegrationDeps = Seq(
-    "org.wvlet.airframe" %% "airframe-log"                   % "20.5.1",
-    "org.slf4j"           % "slf4j-jdk14"                    % "1.7.32",
+    "org.wvlet.airframe" %% "airframe-log"                   % "22.6.1",
+    "org.slf4j"           % "slf4j-jdk14"                    % "1.7.36",
     "com.dimafeng"       %% "testcontainers-scala-core"      % testContainersVersion,
     "com.dimafeng"       %% "testcontainers-scala-cassandra" % testContainersVersion,
-    "org.testcontainers"  % "testcontainers"                 % "1.16.3"
+    "org.testcontainers"  % "testcontainers"                 % "1.17.2"
   ).map(_ % "it")
 
 }

@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
-import zio.stream.Stream
+import zio.stream.{ Stream, ZStream }
 import zio.stream.ZStream.Pull
 
 import scala.jdk.CollectionConverters.IterableHasAsScala
@@ -37,6 +37,33 @@ trait Session {
 }
 
 object Session {
+
+  def prepare(stmt: String): RIO[Has[Session], PreparedStatement] =
+    ZIO.serviceWith(_.prepare(stmt))
+
+  def execute(stmt: Statement[_]): RIO[Has[Session], AsyncResultSet] =
+    ZIO.serviceWith(_.execute(stmt))
+
+  def execute(query: String): RIO[Has[Session], AsyncResultSet] =
+    ZIO.serviceWith(_.execute(query))
+
+  def select(stmt: Statement[_]): ZStream[Has[Session], Throwable, Row] =
+    ZStream.serviceWithStream(_.select(stmt))
+
+  def selectFirst(stmt: Statement[_]): RIO[Has[Session], Option[Row]] =
+    ZIO.serviceWith(_.selectFirst(stmt))
+
+  def metrics: URIO[Has[Session], Option[Metrics]]                             = ZIO.access(_.get.metrics)
+  def name: URIO[Has[Session], String]                                         = ZIO.access(_.get.name)
+  def refreshSchema: RIO[Has[Session], Metadata]                               = ZIO.serviceWith(_.refreshSchema)
+  def setSchemaMetadataEnabled(newValue: Boolean): RIO[Has[Session], Metadata] =
+    ZIO.serviceWith(_.setSchemaMetadataEnabled(newValue))
+  def isSchemaMetadataEnabled: URIO[Has[Session], Boolean]                     = ZIO.access(_.get.isSchemaMetadataEnabled)
+  def checkSchemaAgreement: RIO[Has[Session], Boolean]                         = ZIO.serviceWith(_.checkSchemaAgreement)
+
+  def context: URIO[Has[Session], DriverContext]          = ZIO.access(_.get.context)
+  def keyspace: URIO[Has[Session], Option[CqlIdentifier]] = ZIO.access(_.get.keyspace)
+
   private final case class Live(private val underlying: CqlSession) extends Session {
     override def prepare(stmt: String): Task[PreparedStatement] =
       Task.fromCompletionStage(underlying.prepareAsync(stmt))

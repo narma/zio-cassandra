@@ -18,12 +18,12 @@ CQL ported from [ringcentral/cassandra4io](https://github.com/ringcentral/cassan
 #### Dependency:
 For ZIO 1.x
 ```scala
-libraryDependencies += "st.alzo" %% "zio-cassandra" % "1.2.0"
+libraryDependencies += "st.alzo" %% "zio-cassandra" % zioCassandra
 ```
 
 ### Create a connection to Cassandra
 ```scala
-import zio.cassandra.CassandraSession
+import zio.cassandra.session.Session
 
 import com.datastax.oss.driver.api.core.CqlSession
 
@@ -35,13 +35,13 @@ val builder = CqlSession
       .withLocalDatacenter("datacenter1")
       .withKeyspace("awesome") 
 
-val session = CassandraSession.make(builder)
+val session = Session.make(builder)
 ```
 
 ## Work with CQL interpolator
 
 Gently ported from [cassadnra4io](https://github.com/ringcentral/cassandra4io) cql
-package `zio.cassandra.cql` introduces typed way to deal with cql queries:
+package `zio.cassandra.session.cql` introduces typed way to deal with cql queries:
 
 ### Simple syntax
 
@@ -49,8 +49,8 @@ This syntax reuse implicit driver prepared statements cache
 
 ```scala
 import com.datastax.oss.driver.api.core.ConsistencyLevel
-import zio.cassandra.CassandraSession
-import zio.cassandra.cql._
+import zio.cassandra.session.Session
+import zio.cassandra.session.cql._
 import zio._
 
 case class Model(id: Int, data: String)
@@ -60,7 +60,7 @@ trait Service {
   def get(id: Int): Task[Option[Model]]
 }
 
-class ServiceImpl(session: CassandraSession) extends Service {
+class ServiceImpl(session: Session) extends Service {
 
   private def insertQuery(value: Model) =
     cql"insert into table (id, data) values (${value.id}, ${value.data})"
@@ -69,8 +69,8 @@ class ServiceImpl(session: CassandraSession) extends Service {
   private def selectQuery(id: Int) =
     cql"select id, data from table where id = $id".as[Model]
   
-  override def put(value: Model) = insertQuery(value).execute(session).unit
-  override def get(id: Int) = selectQuery(id).selectOne(session)
+  override def put(value: Model) = insertQuery(value).execute.unit
+  override def get(id: Int) = selectQuery(id).selectFirst.provideSome(session)
 }
 ```
 
@@ -81,34 +81,39 @@ When you want control your prepared statements manually.
 ```scala
 import zio.duration._
 import com.datastax.oss.driver.api.core.ConsistencyLevel
-import zio.cassandra.CassandraSession
-import zio.cassandra.cql._
+import zio.cassandra.session.Session
+import zio.cassandra.session.cql._
 import zio.stream._
-    
+import zio._
+
 case class Model(id: Int, data: String)
-  
+
 trait Service {
   def put(value: Model): Task[Unit]
+
   def get(id: Int): Task[Option[Model]]
+
   def getAll(): Stream[Throwable, Model]
 }
-    
+
 object Service {
-  
+
   private val insertQuery = cqlt"insert into table (id, data) values (${Put[Int]}, ${Put[String]})"
     .config(_.setTimeout(1.second))
   private val selectQuery = cqlt"select id, data from table where id = ${Put[Int]}".as[Model]
   private val selectAllQuery = cqlt"select id, data from table".as[Model]
 
-  def apply(session: CassandraSession) = for {
-    insert <- insertQuery.prepare(session)
-    select <- selectQuery.prepare(session)      
-    selectAll <- selectAllQuery.prepare(session)
+  def apply(session: Session) = for {
+    insert <- insertQuery.prepare
+    select <- selectQuery.prepare
+    selectAll <- selectAllQuery.prepare
   } yield new Service {
-    override def put(value: Model) = insert(value.id, value.data).execute.unit
+    override def put(value: Model) = insert(value.id, value.data).execute.unit.provideCustomLayer(session)
+
     override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).selectOne
+
     override def getAll() = selectAll().config(_.setExecutionProfileName("default")).select
-  } 
+  }
 } 
 ```
 
@@ -136,61 +141,26 @@ create table person_attributes(
 Here is how to insert and select data from the `person_attributes` table:
 
 ```scala
+import zio._
+import zio.cassandra.session.Session
+import zio.cassandra.session.cql._
+import zio.stream._
+
+
 final case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
-object BasicInfo {
-  implicit val cqlReads: Reads[BasicInfo]   = FromUdtValue.deriveReads[BasicInfo]
-  implicit val cqlBinder: Binder[BasicInfo] = ToUdtValue.deriveBinder[BasicInfo]
-}
-
 final case class PersonAttribute(personId: Int, info: BasicInfo)
-```
 
-We provide a set of typeclasses (`FromUdtValue` and `ToUDtValue`) under the hood that automatically convert your Scala
-types into types that Cassandra can understand without having to manually convert your data-types into Datastax Java
-driver's `UdtValue`s.
 
-```scala
-import zio.stream.Stream
-
-class UDTUsageExample(session: CassandraSession) {
+class UDTUsageExample {
   val data = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
-  val insert: F[Boolean] =
+  val insert: RIO[Has[Session], Boolean] =
     cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-            .execute(session)
+            .execute
 
-  val retrieve: Stream[Throwable, PersonAttribute] = 
+  val retrieve: ZStream[Has[Session], Throwable, PersonAttribute] = 
     cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
             .as[PersonAttribute]
-            .select(session)
-}
-```
-
-### More control over the transformation process of `UdtValue`s
-
-If you wanted to have additional control into how you map data-types to and from Cassandra rather than using `FromUdtValue`
-& `ToUdtValue`, we expose the Datastax Java driver API to you for full control. Here is an example using `BasicInfo`:
-
-```scala
-object BasicInfo {
-  implicit val cqlReads: Reads[BasicInfo] = Reads[UdtValue].map { udtValue =>
-    BasicInfo(
-      weight = udtValue.getDouble("weight"),
-      height = udtValue.getString("height"),
-      datapoints = udtValue
-        .getSet[java.lang.Integer]("datapoints", classOf[java.lang.Integer])
-        .asScala
-        .toSet
-        .map { int: java.lang.Integer => Int.unbox(int) }
-    )
-  }
-
-  implicit val cqlBinder: Binder[BasicInfo] = Binder[UdtValue].contramapUDT { (info, constructor) =>
-    constructor
-      .newValue()
-      .setDouble("weight", info.weight)
-      .setString("height", info.height)
-      .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
-  }
+            .select
 }
 ```
 
@@ -200,21 +170,19 @@ code.
 
 ### Raw API without cql
 ```scala
-// Cassandra Session:
-  val session = CassandraSession.make(config)
-//OR
-  val session = CassandraSession.make(cqlSessionBuilder)
+  import zio._
+  import zio.cassandra.session.Session
 
 // Use:
   val job = for {
-    session  <- ZIO.service[CassandraSession]
+    session  <- ZIO.service[Session]
     _        <- session.execute("insert ...")
     prepared <- session.prepare("select ...")
-    select   <- session.bind(prepared, Seq(args))
-    row      <- session.selectOne(select, profileName = "oltp")
+    select   <- Task(prepared.bind(1, 2))
+    row      <- session.selectFirst(select)
   } yield row
   
-  job.provideCustomLayer(CassandraSession.make(config).toLayer)
+  job.provideCustomLayer(Session.live)
 
 ```
 

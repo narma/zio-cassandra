@@ -1,11 +1,9 @@
 package zio.cassandra.session.cql.codec
 
-import com.datastax.oss.driver.api.core.cql.{ ColumnDefinition, Row }
+import com.datastax.oss.driver.api.core.cql.{ColumnDefinition, Row}
 import shapeless._
-import shapeless.labelled.{ field, FieldType }
+import shapeless.labelled.{FieldType, field}
 import zio.cassandra.session.cql.codec.Reads.instance
-
-import scala.annotation.nowarn
 
 /** The main typeclass for decoding Cassandra values, the only one that matters. <br>
   * [[zio.cassandra.session.cql.codec.CellReads]] and [[zio.cassandra.session.cql.codec.UdtReads]] are mostly an
@@ -715,8 +713,7 @@ trait ReadsInstances2 extends ReadsInstances3 {
     }
 
   implicit def genericReads[T, Repr](implicit
-    // compiler is lying, this configuration is actually used for Reads[Repr] derivation
-    @nowarn("msg=never used") configuration: Configuration,
+    configuration: Configuration,
     gen: LabelledGeneric.Aux[T, Repr],
     reads: Reads[Repr]
   ): Reads[T] =
