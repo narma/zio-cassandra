@@ -4,8 +4,8 @@
 
 [Link-SonatypeReleases]: https://oss.sonatype.org/content/repositories/releases/st/alzo/zio-cassandra_2.13/ "Sonatype Releases"
 [Link-SonatypeSnapshots]: https://oss.sonatype.org/content/repositories/snapshots/st/alzo/zio-cassandra_2.13/ "Sonatype Snapshots"
-[Badge-SonatypeReleases]: https://img.shields.io/nexus/r/https/oss.sonatype.org/st.alzo/zio-cassandra_2.13.svg "Sonatype Releases"
-[Badge-SonatypeSnapshots]: https://img.shields.io/nexus/s/https/oss.sonatype.org/st.alzo/zio-cassandra_2.13.svg "Sonatype Snapshots"
+[Badge-SonatypeReleases]: https://img.shields.io/nexus/r/https/s01.oss.sonatype.org/st.alzo/zio-cassandra_2.13.svg "Sonatype Releases"
+[Badge-SonatypeSnapshots]: https://img.shields.io/nexus/s/https/s01.oss.sonatype.org/st.alzo/zio-cassandra_2.13.svg "Sonatype Snapshots"
 
 This is lightweight ZIO wrapper for latest datastax 4.x driver.
 
@@ -16,7 +16,6 @@ CQL ported from [ringcentral/cassandra4io](https://github.com/ringcentral/cassan
 ## Usage
 
 #### Dependency:
-For ZIO 1.x
 ```scala
 libraryDependencies += "st.alzo" %% "zio-cassandra" % zioCassandra
 ```
@@ -69,7 +68,7 @@ class ServiceImpl(session: Session) extends Service {
   private def selectQuery(id: Int) =
     cql"select id, data from table where id = $id".as[Model]
   
-  override def put(value: Model) = insertQuery(value).execute.unit
+  override def put(value: Model) = insertQuery(value).execute.unit.provide(session)
   override def get(id: Int) = selectQuery(id).selectFirst.provideSome(session)
 }
 ```
@@ -79,7 +78,6 @@ class ServiceImpl(session: Session) extends Service {
 When you want control your prepared statements manually.
 
 ```scala
-import zio.duration._
 import com.datastax.oss.driver.api.core.ConsistencyLevel
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql._
@@ -108,9 +106,9 @@ object Service {
     select <- selectQuery.prepare
     selectAll <- selectAllQuery.prepare
   } yield new Service {
-    override def put(value: Model) = insert(value.id, value.data).execute.unit.provideCustomLayer(session)
+    override def put(value: Model) = insert(value.id, value.data).execute.unit.provide(session)
 
-    override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).selectOne
+    override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).selectFirst
 
     override def getAll() = selectAll().config(_.setExecutionProfileName("default")).select
   }
@@ -153,11 +151,11 @@ final case class PersonAttribute(personId: Int, info: BasicInfo)
 
 class UDTUsageExample {
   val data = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
-  val insert: RIO[Has[Session], Boolean] =
+  val insert: RIO[Session, Boolean] =
     cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
             .execute
 
-  val retrieve: ZStream[Has[Session], Throwable, PersonAttribute] = 
+  val retrieve: ZStream[Session, Throwable, PersonAttribute] = 
     cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
             .as[PersonAttribute]
             .select
@@ -178,7 +176,7 @@ code.
     session  <- ZIO.service[Session]
     _        <- session.execute("insert ...")
     prepared <- session.prepare("select ...")
-    select   <- Task(prepared.bind(1, 2))
+    select   <- ZIO.attempt(prepared.bind(1, 2))
     row      <- session.selectFirst(select)
   } yield row
   
