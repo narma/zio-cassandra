@@ -22,6 +22,12 @@ object Reads extends ReadsInstances1 {
 
   def instance[T](f: Row => T): Reads[T] = (row: Row) => f(row)
 
+  final implicit class ReadsOps[A](private val reads: Reads[A]) extends AnyVal {
+
+    def map[B](f: A => B): Reads[B] = instance(row => f(reads.read(row)))
+
+  }
+
   /** Useful when you want to "cache" [[zio.cassandra.session.cql.codec.Reads]] instance (e.g. to decrease compilation
     * time or make sure it captures the correct [[zio.cassandra.session.cql.codec.Configuration]])
     *
