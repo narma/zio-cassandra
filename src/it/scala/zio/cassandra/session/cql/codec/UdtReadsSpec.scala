@@ -1,11 +1,11 @@
 package zio.cassandra.session.cql.codec
 
 import zio.{ Chunk, ZIO }
-import zio.cassandra.session.{ CassandraSpecUtils, Session }
+import zio.cassandra.session.{ Session, ZIOCassandraSpec, ZIOCassandraSpecUtils }
 import zio.test.Assertion.hasSameElements
 import zio.test._
 
-object UdtReadsSpec extends CassandraSpecUtils {
+object UdtReadsSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
 
   final case class UdtTypeTestData(
     data: String,
@@ -24,8 +24,8 @@ object UdtReadsSpec extends CassandraSpecUtils {
 
   private val nameTestData = NameTestData(0, UdtNameTestData("ALL-UPPER", "all-lower", "some-name", "some-long-name"))
 
-  val readsTests = suite("UdtReads")(
-    testM("should read simple data types") {
+  val spec: Spec[Session, Throwable] = suite("UdtReads")(
+    test("should read simple data types") {
       val expected =
         Chunk(
           // cassandra can't differentiate null and List.empty / Map.empty, but can differentiate null and Set.empty
@@ -53,11 +53,11 @@ object UdtReadsSpec extends CassandraSpecUtils {
         session <- ZIO.service[Session]
         result  <- session
                      .select(s"select id, udt FROM $keyspace.udt_reads_type_test")
-                     .mapM(read[TypeTestData](_))
+                     .mapZIO(read[TypeTestData](_))
                      .runCollect
       } yield assert(result)(hasSameElements(expected))
     },
-    testM("should read names as is") {
+    test("should read names as is") {
       implicit val configuration: Configuration = Configuration(identity(_))
 
       for {
@@ -69,7 +69,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read names as is regardless of order in row") {
+    test("should read names as is regardless of order in row") {
       implicit val configuration: Configuration = Configuration(identity(_))
 
       for {
@@ -81,7 +81,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read names transformed to snake_case") {
+    test("should read names transformed to snake_case") {
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -91,7 +91,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
     },
-    testM("should read names transformed to snake_case regardless of order in row") {
+    test("should read names transformed to snake_case regardless of order in row") {
       for {
         session <- ZIO.service[Session]
         result  <- session

@@ -6,11 +6,13 @@ object Dependencies {
     val scala2   = "2.13.8"
     val scala3   = "3.1.3"
     val allScala = Seq(scala2, scala3)
+
+    val cassandraDriverVersion = "4.14.1"
   }
 
-  val cassandraDriverVersion = "4.14.1"
+  import V._
 
-  val zioVersion = "1.0.16"
+  val zioVersion = "2.0.0"
 
   val testContainersVersion = "0.40.8"
 

@@ -3,23 +3,23 @@ package zio.cassandra.session.cql.query
 import com.datastax.oss.driver.api.core.cql.BoundStatement
 import shapeless.HList
 import shapeless.ops.hlist.Prepend
+import zio.RIO
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.cql.codec.Reads
-import zio.stream.{ Stream, ZStream }
-import zio.{ Has, RIO }
+import zio.stream.ZStream
 
 case class ParameterizedQuery[V <: HList: Binder, R: Reads] private (template: QueryTemplate[V, R], values: V) {
   def +(that: String): ParameterizedQuery[V, R] = ParameterizedQuery[V, R](this.template + that, this.values)
   def as[R1: Reads]: ParameterizedQuery[V, R1]  = ParameterizedQuery[V, R1](template.as[R1], values)
 
-  def select: ZStream[Has[Session], Throwable, R] =
-    Stream.unwrap(template.prepare.map(_.applyProduct(values).select))
+  def select: ZStream[Session, Throwable, R] =
+    ZStream.unwrap(template.prepare.map(_.applyProduct(values).select))
 
-  def selectFirst: RIO[Has[Session], Option[R]] =
+  def selectFirst: RIO[Session, Option[R]] =
     template.prepare.flatMap(_.applyProduct(values).selectFirst)
 
-  def execute: RIO[Has[Session], Boolean] =
+  def execute: RIO[Session, Boolean] =
     template.prepare.map(_.applyProduct(values)).flatMap(_.execute)
 
   def config(config: BoundStatement => BoundStatement): ParameterizedQuery[V, R] =

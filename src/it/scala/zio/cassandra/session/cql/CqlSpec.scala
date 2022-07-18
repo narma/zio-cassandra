@@ -1,20 +1,19 @@
 package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
-import zio.cassandra.session.Session
+import zio.cassandra.session.{ Session, ZIOCassandraSpec }
 import zio.cassandra.session.cql.codec.UnexpectedNullValue
-import zio.duration._
-import zio.stream.Stream
+import zio.stream.ZStream
 import zio.test.Assertion._
 import zio.test.TestAspect.ignore
 import zio.test._
-import zio.{ Chunk, Has, RIO, ZIO }
+import zio.{ test => _, _ }
 
 import java.time.{ LocalDate, LocalTime }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
-object CqlSpec {
+object CqlSpec extends ZIOCassandraSpec {
 
   case class Data(id: Long, data: String)
   case class OptData(id: Long, data: Option[String])
@@ -55,8 +54,8 @@ object CqlSpec {
     val _ = ignore // make compiler happy about unused import
   }
 
-  val cqlSuite = suite("cql suite")(
-    testM("interpolated select template should return data from migration") {
+  val spec: Spec[Session, Throwable] = suite("cql suite")(
+    test("interpolated select template should return data from migration") {
       for {
         prepared <- cqlt"select data FROM tests.test_data WHERE id in ${Put[List[Long]]}"
                       .as[String]
@@ -66,7 +65,7 @@ object CqlSpec {
         results  <- query.select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
-    testM("interpolated select template should return tuples from migration") {
+    test("interpolated select template should return tuples from migration") {
       for {
         prepared <- cqlt"select id, data, dataset FROM tests.test_data WHERE id in ${Put[List[Long]]}"
                       .as[(Long, String, Option[Set[Int]])]
@@ -77,7 +76,7 @@ object CqlSpec {
         results == Chunk((1L, "one", Some(Set.empty[Int])), (2L, "two", Some(Set(201))), (3L, "three", None))
       }
     },
-    testM("interpolated select template should return tuples from migration with multiple binding") {
+    test("interpolated select template should return tuples from migration with multiple binding") {
       for {
         query   <-
           cqlt"select data FROM tests.test_data_multiple_keys WHERE id1 = ${Put[Long]} and id2 = ${Put[Int]}"
@@ -86,7 +85,7 @@ object CqlSpec {
         results <- query(1L, 2).config(_.setExecutionProfileName("default")).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
-    testM(
+    test(
       "interpolated select template should return tuples from migration with multiple binding and margin stripped"
     ) {
       for {
@@ -95,7 +94,7 @@ object CqlSpec {
         results <- query(1L, 2).config(_.setExecutionProfileName("default")).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
-    testM("interpolated select template should return data case class from migration") {
+    test("interpolated select template should return data case class from migration") {
       for {
         prepared <-
           cqlt"select id, data FROM tests.test_data WHERE id in ${Put[List[Long]]}".as[Data].prepare
@@ -103,13 +102,13 @@ object CqlSpec {
         results  <- query.select.runCollect
       } yield assertTrue(results == Chunk(Data(1, "one"), Data(2, "two"), Data(3, "three")))
     },
-    testM("interpolated select template should be reusable") {
+    test("interpolated select template should be reusable") {
       for {
         query  <- cqlt"select data FROM tests.test_data WHERE id = ${Put[Long]}".as[String].prepare
-        result <- Stream.fromIterable(Seq(1L, 2L, 3L)).flatMap(i => query(i).select).runCollect
+        result <- ZStream.fromIterable(Seq(1L, 2L, 3L)).flatMap(i => query(i).select).runCollect
       } yield assertTrue(result == Chunk("one", "two", "three"))
     },
-    testM("interpolated select should return data from migration") {
+    test("interpolated select should return data from migration") {
       def getDataByIds(ids: List[Long]) =
         cql"select data FROM tests.test_data WHERE id in $ids"
           .as[String]
@@ -118,21 +117,21 @@ object CqlSpec {
         results <- getDataByIds(List(1, 2, 3)).select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
-    testM("interpolated select should return tuples from migration") {
+    test("interpolated select should return tuples from migration") {
       def getAllByIds(ids: List[Long]) =
         cql"select id, data FROM tests.test_data WHERE id in $ids".as[(Long, String)]
       for {
         results <- getAllByIds(List(1, 2, 3)).config(_.setQueryTimestamp(0L)).select.runCollect
       } yield assertTrue(results == Chunk((1L, "one"), (2L, "two"), (3L, "three")))
     },
-    testM("interpolated select should return tuples from migration with multiple binding") {
+    test("interpolated select should return tuples from migration with multiple binding") {
       def getAllByIds(id1: Long, id2: Int) =
         cql"select data FROM tests.test_data_multiple_keys WHERE id1 = $id1 and id2 = $id2".as[String]
       for {
         results <- getAllByIds(1, 2).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
-    testM("interpolated select should return tuples from migration with multiple binding and margin stripped") {
+    test("interpolated select should return tuples from migration with multiple binding and margin stripped") {
       def getAllByIds(id1: Long, id2: Int) =
         cql"""select data FROM tests.test_data_multiple_keys
              |WHERE id1 = $id1 and id2 = $id2""".stripMargin.as[String]
@@ -140,14 +139,14 @@ object CqlSpec {
         results <- getAllByIds(1, 2).select.runCollect
       } yield assertTrue(results == Chunk("one-two"))
     },
-    testM("interpolated select should return data case class from migration") {
+    test("interpolated select should return data case class from migration") {
       def getIds(ids: List[Long]) =
         cql"select id, data FROM tests.test_data WHERE id in $ids".as[Data]
       for {
         results <- getIds(List(1, 2, 3)).select.runCollect
       } yield assertTrue(results == Chunk(Data(1, "one"), Data(2, "two"), Data(3, "three")))
     },
-    testM(
+    test(
       "interpolated inserts and selects should produce UDTs and return data case classes when nested case classes are used"
     ) {
       val data =
@@ -161,14 +160,14 @@ object CqlSpec {
                     .runCollect
       } yield assertTrue(result.length == 1 && result.head == data)
     },
-    testM("interpolated inserts and selects should handle cassandra collections") {
+    test("interpolated inserts and selects should handle cassandra collections") {
       val dataRow1 = CollectionTestRow(1, Map("2" -> UUID.randomUUID()), Set(1, 2, 3), Option(List(LocalDate.now())))
       val dataRow2 = CollectionTestRow(2, Map("3" -> UUID.randomUUID()), Set(4, 5, 6), None)
 
-      def insert(data: CollectionTestRow): RIO[Has[Session], Boolean] =
+      def insert(data: CollectionTestRow): RIO[Session, Boolean] =
         cql"INSERT INTO tests.test_collection (id, maptest, settest, listtest) VALUES (${data.id}, ${data.maptest}, ${data.settest}, ${data.listtest})".execute
 
-      def retrieve(id: Int, ids: Int*): RIO[Has[Session], Chunk[CollectionTestRow]] = {
+      def retrieve(id: Int, ids: Int*): RIO[Session, Chunk[CollectionTestRow]] = {
         val allIds = id :: ids.toList
         cql"SELECT id, maptest, settest, listtest FROM tests.test_collection WHERE id IN $allIds"
           .as[CollectionTestRow]
@@ -177,14 +176,14 @@ object CqlSpec {
       }
 
       for {
-        _    <- ZIO.foreachPar_(List(dataRow1, dataRow2))(insert)
+        _    <- ZIO.foreachParDiscard(List(dataRow1, dataRow2))(insert)
         res1 <- retrieve(dataRow1.id)
         res2 <- retrieve(dataRow2.id)
       } yield assertTrue(res1.length == 1 && res1.head == dataRow1) && assertTrue(
         res2.length == 1 && res2.head == dataRow2
       )
     },
-    testM("interpolated inserts and selects should handle nested UDTs in heavily nested collections") {
+    test("interpolated inserts and selects should handle nested UDTs in heavily nested collections") {
       val row = TableContainingExampleCollectionNestedUdtType(
         id = 1,
         data = ExampleCollectionNestedUdtType(
@@ -241,7 +240,7 @@ object CqlSpec {
                     .runCollect
       } yield assertTrue(actual.length == 1 && actual.head == row)
     },
-    testM("interpolated inserts and selects should handle UDTs and primitives in heavily nested collections") {
+    test("interpolated inserts and selects should handle UDTs and primitives in heavily nested collections") {
       val row    = TableContainingExampleNestedPrimitiveType(
         id = 1,
         data = ExampleNestedPrimitiveType(
@@ -265,13 +264,13 @@ object CqlSpec {
         actual <- retrieve
       } yield assertTrue(actual.length == 1 && actual.head == row)
     },
-    testM("interpolated select should bind constants") {
+    test("interpolated select should bind constants") {
       val query = cql"select data FROM tests.test_data WHERE id = ${1L}".as[String]
       for {
         result <- query.select.runCollect
       } yield assertTrue(result == Chunk("one"))
     },
-    testM("cqlConst allows you to interpolate on what is usually not possible with cql strings") {
+    test("cqlConst allows you to interpolate on what is usually not possible with cql strings") {
       val data         =
         PersonAttribute(personAttributeIdxCounter.incrementAndGet(), BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
       val keyspaceName = "tests"
@@ -292,32 +291,32 @@ object CqlSpec {
       } yield assertTrue(result.isDefined && result.get == data)
     },
     suite("handle NULL values")(
-      testM("return None for Option[String]") {
+      test("return None for Option[String]") {
         for {
           result <- cql"select data FROM tests.test_data WHERE id = 0".as[Option[String]].selectFirst
         } yield assertTrue(result.isDefined && result.get.isEmpty)
       },
-      testM("raise error for String(non-primitive)") {
+      test("raise error for String(non-primitive)") {
         for {
           result <- cql"select data FROM tests.test_data WHERE id = 0".as[String].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
-      testM("raise error for Int(primitive)") {
+      test("raise error for Int(primitive)") {
         for {
           result <- cql"select count FROM tests.test_data WHERE id = 0".as[Int].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
-      testM("return value for field in case class have Option type") {
+      test("return value for field in case class have Option type") {
         for {
           row <- cql"select id, data FROM tests.test_data WHERE id = 0".as[OptData].selectFirst
         } yield assertTrue(row.isDefined && row.get.data.isEmpty)
       },
-      testM("raise error if field in case class have Option type") {
+      test("raise error if field in case class have Option type") {
         for {
           result <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
         } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
       },
-      testM("render meaningful message in error") {
+      test("render meaningful message in error") {
         for {
           result <- cql"select id, data FROM tests.test_data WHERE id = 0".as[Data].selectFirst.either
         } yield assert(result) {
@@ -331,7 +330,7 @@ object CqlSpec {
         }
       },
       suite("handle NULL values with udt")(
-        testM("return None when optional udt value is null") {
+        test("return None when optional udt value is null") {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
 
           for {
@@ -343,7 +342,7 @@ object CqlSpec {
                         .runCollect
           } yield assertTrue(result.length == 1 && result.head == data)
         },
-        testM("raise error when non-optional udt value is null") {
+        test("raise error when non-optional udt value is null") {
           val data = OptPersonAttribute(personAttributeIdxCounter.incrementAndGet(), None)
 
           for {
@@ -355,7 +354,7 @@ object CqlSpec {
                         .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
-        testM("return None when udt field value is null for optional type") {
+        test("return None when udt field value is null for optional type") {
           val data = PersonOptAttribute(
             personAttributeIdxCounter.incrementAndGet(),
             OptBasicInfo(None, None, None)
@@ -369,7 +368,7 @@ object CqlSpec {
                         .selectFirst
           } yield assertTrue(result.contains(data))
         },
-        testM("raise error if udt field value is mapped to String(non-primitive)") {
+        test("raise error if udt field value is mapped to String(non-primitive)") {
           val data =
             PersonOptAttribute(
               personAttributeIdxCounter.incrementAndGet(),
@@ -385,7 +384,7 @@ object CqlSpec {
                         .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
-        testM("raise error if udt field value is mapped to Double(primitive)") {
+        test("raise error if udt field value is mapped to Double(primitive)") {
           val data =
             PersonOptAttribute(
               personAttributeIdxCounter.incrementAndGet(),
@@ -401,7 +400,7 @@ object CqlSpec {
                         .either
           } yield assert(result)(isLeft(isSubtype[UnexpectedNullValue](Assertion.anything)))
         },
-        testM("render meaningful message in UDT error") {
+        test("render meaningful message in UDT error") {
           val data =
             PersonOptAttribute(
               personAttributeIdxCounter.incrementAndGet(),
@@ -425,7 +424,7 @@ object CqlSpec {
             }
           }
         },
-        testM("render meaningful message in nested UDT error") {
+        test("render meaningful message in nested UDT error") {
           val data =
             TableContainingNestedType(
               0,
