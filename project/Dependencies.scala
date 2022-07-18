@@ -20,7 +20,7 @@ object Dependencies {
 
   val zioDependencies = Seq(
     "dev.zio" %% "zio"         % zioVersion,
-    "dev.zio" %% "zio-macros"  % zioVersion,
+    "dev.zio" %% "zio-macros"  % zioVersion % "compile-internal",
     "dev.zio" %% "zio-streams" % zioVersion
   )
 
