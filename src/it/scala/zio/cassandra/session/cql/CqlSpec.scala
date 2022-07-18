@@ -436,9 +436,9 @@ object CqlSpec {
             _      <-
               cql"INSERT INTO tests.nested_udt_table (id, data) VALUES (${data.id}, ${data.data})".execute
             result <- cql"SELECT id, data FROM tests.nested_udt_table WHERE id = ${data.id}"
-              .as[TableContainingNestedType]
-              .selectFirst
-              .either
+                        .as[TableContainingNestedType]
+                        .selectFirst
+                        .either
           } yield assert(result) {
             isLeft {
               hasMessage {
@@ -448,7 +448,7 @@ object CqlSpec {
               }
             }
           }
-        },
+        }
       )
     )
   )

@@ -6,12 +6,14 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
+import zio.macros.accessible
 import zio.stream.Stream
 import zio.stream.ZStream.Pull
 
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
+@accessible
 trait Session {
   def prepare(stmt: String): Task[PreparedStatement]
 
@@ -37,6 +39,7 @@ trait Session {
 }
 
 object Session {
+
   private final case class Live(private val underlying: CqlSession) extends Session {
     override def prepare(stmt: String): Task[PreparedStatement] =
       Task.fromCompletionStage(underlying.prepareAsync(stmt))

@@ -5,8 +5,6 @@ import shapeless._
 import shapeless.labelled.{ field, FieldType }
 import zio.cassandra.session.cql.codec.UdtReads._
 
-import scala.annotation.nowarn
-
 /** Deserializer created specifically for UDT values.<br> Note that unlike [[zio.cassandra.session.cql.codec.Reads]],
   * this reader can be (is) recursive, so each instance of [[zio.cassandra.session.cql.codec.UdtReads]] can be seen as
   * an instance of [[zio.cassandra.session.cql.codec.CellReads]], while at the same time it might need
@@ -48,8 +46,7 @@ trait UdtReadsInstances1 {
     }
 
   implicit def genericUdtReads[T, Repr](implicit
-    // compiler is lying, this configuration is actually used for Reads[Repr] derivation
-    @nowarn("msg=never used") configuration: Configuration,
+    configuration: Configuration,
     gen: LabelledGeneric.Aux[T, Repr],
     reads: Lazy[UdtReads[Repr]]
   ): UdtReads[T] =

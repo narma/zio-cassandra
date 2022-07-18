@@ -10,8 +10,8 @@ import zio.cassandra.session.cql.codec.UdtWrites._
   * [[zio.cassandra.session.cql.codec.CellWrites]], while at the same time it might need
   * [[zio.cassandra.session.cql.codec.CellWrites]] instances to work.<br>
   *
-  * The reason why it needs `structure: UdtValue` param is because we cannot create an `UdtValue` out of thin air,
-  * we can only fill it with values. The only one who can properly create an UdtValue is java driver, so it's up to a
+  * The reason why it needs `structure: UdtValue` param is because we cannot create an `UdtValue` out of thin air, we
+  * can only fill it with values. The only one who can properly create an UdtValue is java driver, so it's up to a
   * caller to ask the driver to create a dummy UdtValue, which we'll use.
   */
 trait UdtWrites[T] {

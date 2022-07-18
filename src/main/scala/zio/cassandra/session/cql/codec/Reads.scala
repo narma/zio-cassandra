@@ -5,8 +5,6 @@ import shapeless._
 import shapeless.labelled.{ field, FieldType }
 import zio.cassandra.session.cql.codec.Reads.instance
 
-import scala.annotation.nowarn
-
 /** The main typeclass for decoding Cassandra values, the only one that matters. <br>
   * [[zio.cassandra.session.cql.codec.CellReads]] and [[zio.cassandra.session.cql.codec.UdtReads]] are mostly an
   * implementation details. As long as you can provide and instance of [[zio.cassandra.session.cql.codec.Reads]] for
@@ -715,8 +713,7 @@ trait ReadsInstances2 extends ReadsInstances3 {
     }
 
   implicit def genericReads[T, Repr](implicit
-    // compiler is lying, this configuration is actually used for Reads[Repr] derivation
-    @nowarn("msg=never used") configuration: Configuration,
+    configuration: Configuration,
     gen: LabelledGeneric.Aux[T, Repr],
     reads: Reads[Repr]
   ): Reads[T] =

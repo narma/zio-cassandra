@@ -54,7 +54,7 @@ object BoundValue {
     BoundValue(a, ev)
 }
 
-class CqlStringInterpolator(ctx: StringContext) {
+final class CqlStringInterpolator(ctx: StringContext) {
   @tailrec
   private def replaceValuesWithQuestionMark(
     strings: Iterator[String],
@@ -78,7 +78,7 @@ class CqlStringInterpolator(ctx: StringContext) {
       )
     } else acc
 
-  def apply(values: BoundValue[_]*): SimpleQuery[Row] = {
+  final def apply(values: BoundValue[_]*): SimpleQuery[Row] = {
     val queryWithQuestionMark                                     = replaceValuesWithQuestionMark(ctx.parts.iterator, values.iterator, "")
     val assignValuesToStatement: BoundStatement => BoundStatement = { in: BoundStatement =>
       val (configuredBoundStatement, _) =
