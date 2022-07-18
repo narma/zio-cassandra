@@ -33,9 +33,9 @@ object CellWrites extends CellWritesInstances1 {
   def instance[T](f: (T, ProtocolVersion) => ByteBuffer): CellWrites[T] =
     (t: T, protocol: ProtocolVersion, _) => f(t, protocol)
 
-  final implicit class CellWritesOps[T](private val cellWrites: CellWrites[T]) extends AnyVal {
+  final implicit class CellWritesOps[T](private val writes: CellWrites[T]) extends AnyVal {
 
-    def contramap[V](f: V => T): CellWrites[V] = instance((v, p, d) => cellWrites.write(f(v), p, d))
+    def contramap[V](f: V => T): CellWrites[V] = instance((v, p, d) => writes.write(f(v), p, d))
 
   }
 

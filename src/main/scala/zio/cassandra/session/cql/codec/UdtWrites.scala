@@ -27,6 +27,12 @@ object UdtWrites extends UdtWritesInstances1 {
   def instance[T](f: (T, UdtValue) => UdtValue): UdtWrites[T] =
     (t: T, udtValue: UdtValue) => f(t, udtValue)
 
+  final implicit class UdtWritesOps[T](private val writes: UdtWrites[T]) extends AnyVal {
+
+    def contramap[V](f: V => T): UdtWrites[V] = instance((t, structure) => writes.write(f(t), structure))
+
+  }
+
 }
 
 trait UdtWritesInstances1 {

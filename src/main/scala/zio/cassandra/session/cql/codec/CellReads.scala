@@ -126,7 +126,7 @@ trait CellReadsInstances3 {
       CodecRegistry.DEFAULT.codecFor(dataType, classOf[UdtValue]).decode(bytes, protocol)
     }
 
-  implicit def rawReadsFromUdtReads[T: UdtReads]: CellReads[T] =
+  implicit def cellReadsFromUdtReads[T: UdtReads]: CellReads[T] =
     CellReads[UdtValue].map(UdtReads[T].read(_))
 
   def requireNonNull(bytes: ByteBuffer): Unit = if (bytes == null) throw UnexpectedNullValue.NullValueInColumn
