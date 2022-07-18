@@ -49,9 +49,9 @@ This syntax reuse implicit driver prepared statements cache
 
 ```scala
 import com.datastax.oss.driver.api.core.ConsistencyLevel
+import zio._
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql._
-import zio._
 
 case class Model(id: Int, data: String)
 
@@ -68,9 +68,9 @@ class ServiceImpl(session: Session) extends Service {
 
   private def selectQuery(id: Int) =
     cql"select id, data from table where id = $id".as[Model]
-  
-  override def put(value: Model) = insertQuery(value).execute.unit
-  override def get(id: Int) = selectQuery(id).selectFirst.provideSome(session)
+
+  override def put(value: Model) = insertQuery(value).execute.unit.provide(Has(session))
+  override def get(id: Int) = selectQuery(id).selectFirst.provide(Has(session))
 }
 ```
 
@@ -79,12 +79,11 @@ class ServiceImpl(session: Session) extends Service {
 When you want control your prepared statements manually.
 
 ```scala
-import zio.duration._
-import com.datastax.oss.driver.api.core.ConsistencyLevel
+import zio._
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql._
+import zio.duration._
 import zio.stream._
-import zio._
 
 case class Model(id: Int, data: String)
 
@@ -108,13 +107,13 @@ object Service {
     select <- selectQuery.prepare
     selectAll <- selectAllQuery.prepare
   } yield new Service {
-    override def put(value: Model) = insert(value.id, value.data).execute.unit.provideCustomLayer(session)
+    override def put(value: Model) = insert(value.id, value.data).execute.unit
 
-    override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).selectOne
+    override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).selectFirst
 
     override def getAll() = selectAll().config(_.setExecutionProfileName("default")).select
   }
-} 
+}
 ```
 
 ## User Defined Type (UDT) support
@@ -164,25 +163,84 @@ class UDTUsageExample {
 }
 ```
 
-Please note that we recommend using `FromUdtValue` and `ToUdtValue` to automatically derive this hand-written (and error-prone)
-code.
+### More control over the transformation process of `UdtValue`s
+
+If you wanted to have additional control into how you map data-types to and from Cassandra rather than using `UdtReads`
+& `UdtWrites`, we expose the Datastax Java driver API to you for full control. Here is an example using `BasicInfo`:
+
+```scala
+import com.datastax.oss.driver.api.core.data.UdtValue
+import zio.cassandra.session.cql.Binder
+import zio.cassandra.session.cql.codec.{ UdtReads, UdtWrites }
+
+import scala.jdk.CollectionConverters.{ SetHasAsJava, SetHasAsScala }
+
+final case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
+
+object BasicInfo {
+
+  implicit val basicInfoUdtReads: UdtReads[BasicInfo] = UdtReads.instance { udtValue =>
+    BasicInfo(
+      weight = udtValue.getDouble("weight"),
+      height = udtValue.getString("height"),
+      datapoints = udtValue
+        .getSet[java.lang.Integer]("datapoints", classOf[java.lang.Integer])
+        .asScala
+        .toSet
+        .map { int: java.lang.Integer => Int.unbox(int) }
+    )
+  }
+
+  implicit val basicInfoUdtWrites: UdtWrites[BasicInfo] = UdtWrites.instance { (info, constructor) =>
+    constructor
+      .setDouble("weight", info.weight)
+      .setString("height", info.height)
+      .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
+  }
+
+  // just an example, will be derived automatically from UdtWrites[BasicInfo]
+  implicit val cqlBinder: Binder[BasicInfo] = Binder[UdtValue].contramapUDT { (info, constructor) =>
+    constructor
+      .newValue()
+      .setDouble("weight", info.weight)
+      .setString("height", info.height)
+      .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
+  }
+
+}
+
+final case class CompactedInfo(weight: Double, height: String)
+
+object CompactedInfo {
+
+  implicit val compactedInfoUdtReads: UdtReads[CompactedInfo] =
+    UdtReads[BasicInfo].map(basicInfo => CompactedInfo(basicInfo.weight, basicInfo.height))
+
+  implicit val compactedInfoUdtWrites: UdtWrites[CompactedInfo] =
+    UdtWrites[BasicInfo].contramap(compactedInfo => BasicInfo(compactedInfo.weight, compactedInfo.height, Set.empty))
+
+}
+```
 
 
 ### Raw API without cql
 ```scala
-  import zio._
-  import zio.cassandra.session.Session
+import com.datastax.oss.driver.api.core.CqlSessionBuilder
+import zio._
+import zio.cassandra.session.Session
+
+val sessionBuilder: ULayer[Has[CqlSessionBuilder]] = ZLayer.fromFunction((_: Any) => ???)
 
 // Use:
-  val job = for {
-    session  <- ZIO.service[Session]
-    _        <- session.execute("insert ...")
-    prepared <- session.prepare("select ...")
-    select   <- Task(prepared.bind(1, 2))
-    row      <- session.selectFirst(select)
-  } yield row
-  
-  job.provideCustomLayer(Session.live)
+val job = for {
+  session  <- ZIO.service[Session]
+  _        <- session.execute("insert ...")
+  prepared <- session.prepare("select ...")
+  select   <- Task(prepared.bind(1, 2))
+  row      <- session.selectFirst(select)
+} yield row
+
+job.provideLayer(sessionBuilder >>> Session.live.toLayer)
 
 ```
 
