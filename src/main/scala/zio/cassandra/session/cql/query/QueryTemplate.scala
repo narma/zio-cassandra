@@ -8,8 +8,6 @@ import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.cql.codec.Reads
 import zio.{ RIO, ZIO }
 
-import scala.annotation.nowarn
-
 case class QueryTemplate[V <: HList: Binder, R: Reads] private[cql] (
   query: String,
   config: BoundStatement => BoundStatement
@@ -33,7 +31,6 @@ case class QueryTemplate[V <: HList: Binder, R: Reads] private[cql] (
     binderForOut: Binder[Out]
   ): QueryTemplate[Out, R] = concat(that)
 
-  @nowarn("msg=is never used")
   def concat[W <: HList, Out <: HList](that: QueryTemplate[W, R])(implicit
     prepend: Prepend.Aux[V, W, Out],
     binderForW: Binder[W],
