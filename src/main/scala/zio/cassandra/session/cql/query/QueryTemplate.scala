@@ -6,7 +6,7 @@ import shapeless.ops.hlist.Prepend
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.cql.codec.Reads
-import zio.{Has, RIO, ZIO}
+import zio.{ Has, RIO, ZIO }
 
 case class QueryTemplate[V <: HList: Binder, R: Reads] private[cql] (
   query: String,
@@ -23,7 +23,7 @@ case class QueryTemplate[V <: HList: Binder, R: Reads] private[cql] (
   def config(config: BoundStatement => BoundStatement): QueryTemplate[V, R] =
     QueryTemplate[V, R](this.query, this.config andThen config)
 
-  def stripMargin: QueryTemplate[V, R]                                      = QueryTemplate[V, R](this.query.stripMargin, this.config)
+  def stripMargin: QueryTemplate[V, R] = QueryTemplate[V, R](this.query.stripMargin, this.config)
 
   def ++[W <: HList, Out <: HList](that: QueryTemplate[W, R])(implicit
     prepend: Prepend.Aux[V, W, Out],

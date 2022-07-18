@@ -2,7 +2,7 @@ package zio.cassandra.session.cql.codec
 
 import com.datastax.oss.driver.api.core.data.UdtValue
 import shapeless._
-import shapeless.labelled.{FieldType, field}
+import shapeless.labelled.{ field, FieldType }
 import zio.cassandra.session.cql.codec.UdtReads._
 
 /** Deserializer created specifically for UDT values.<br> Note that unlike [[zio.cassandra.session.cql.codec.Reads]],

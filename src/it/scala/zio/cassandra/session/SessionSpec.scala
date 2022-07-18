@@ -83,10 +83,9 @@ object SessionSpec extends CassandraSpecUtils {
     },
     testM("selectFirst should return Some(null) for null") {
       for {
-        session <- ZIO.service[Session]
-        result  <- session
-                     .selectFirst(s"select data FROM $keyspace.test_data WHERE id = 0")
-                     .map(_.map(_.getString(0)))
+        result <- Session
+                    .selectFirst(s"select data FROM $keyspace.test_data WHERE id = 0")
+                    .map(_.map(_.getString(0)))
       } yield assertTrue(result.contains(null))
     },
     testM("select will emit in chunks sized equal to statement pageSize") {

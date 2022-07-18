@@ -1,7 +1,7 @@
 package zio.cassandra.session
 
-import com.datastax.oss.driver.api.core.cql.{Row, SimpleStatement}
-import zio.{IO, Task, ZIO}
+import com.datastax.oss.driver.api.core.cql.{ Row, SimpleStatement }
+import zio.{ IO, Task, ZIO }
 import zio.cassandra.session.cql.codec.Reads
 import zio.test.TestFailure
 

@@ -1,8 +1,8 @@
 package zio.cassandra.session.cql.codec
 
-import com.datastax.oss.driver.api.core.cql.{ColumnDefinition, Row}
+import com.datastax.oss.driver.api.core.cql.{ ColumnDefinition, Row }
 import shapeless._
-import shapeless.labelled.{FieldType, field}
+import shapeless.labelled.{ field, FieldType }
 import zio.cassandra.session.cql.codec.Reads.instance
 
 /** The main typeclass for decoding Cassandra values, the only one that matters. <br>
