@@ -22,6 +22,12 @@ object UdtReads extends UdtReadsInstances1 {
 
   def instance[T](f: UdtValue => T): UdtReads[T] = (udtValue: UdtValue) => f(udtValue)
 
+  final implicit class UdtReadsOps[A](private val reads: UdtReads[A]) extends AnyVal {
+
+    def map[B](f: A => B): UdtReads[B] = instance(udtValue => f(reads.read(udtValue)))
+
+  }
+
 }
 
 trait UdtReadsInstances1 {
