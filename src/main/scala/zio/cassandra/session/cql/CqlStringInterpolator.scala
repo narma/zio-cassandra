@@ -12,17 +12,22 @@ sealed abstract class CqlStringInterpolatorBase {
   @tailrec
   final protected def assembleQuery(
     strings: Iterator[String],
-    expressions: Iterator[HasPlaceholder],
+    expressions: Iterator[InterpolatorValue],
     acc: String
   ): String =
     if (strings.hasNext && expressions.hasNext) {
       val str  = strings.next()
       val expr = expressions.next()
 
+      val placeholder = expr match {
+        case l: LiftedValue               => l.toString
+        case _: BoundValue[_] | _: Put[_] => "?"
+      }
+
       assembleQuery(
         strings = strings,
         expressions = expressions,
-        acc = acc + s"$str${expr.placeholder}"
+        acc = acc + s"$str$placeholder"
       )
     } else if (strings.hasNext && !expressions.hasNext) {
       val str = strings.next()
