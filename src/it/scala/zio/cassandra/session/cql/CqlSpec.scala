@@ -3,6 +3,7 @@ package zio.cassandra.session.cql
 import com.datastax.oss.driver.api.core.ConsistencyLevel
 import zio.cassandra.session.{ Session, ZIOCassandraSpec }
 import zio.cassandra.session.cql.codec.UnexpectedNullValue
+import zio.cassandra.session.cql.unsafe.lift
 import zio.stream.ZStream
 import zio.test.Assertion._
 import zio.test.TestAspect.ignore
@@ -447,6 +448,27 @@ object CqlSpec extends ZIOCassandraSpec {
               }
             }
           }
+        }
+      ),
+      suite("put lifted values as is")(
+        test("should handle lifted values (though redundant) in cqlConst") {
+          val tableName = "tests.test_data"
+          for {
+            results <- cqlConst"select data from ${lift(tableName)} where id in (1)".as[String].select.runCollect
+          } yield assertTrue(results == Chunk("one"))
+        },
+        test("should handle lifted values in cql") {
+          val tableName = "tests.test_data"
+          for {
+            results <- cql"select data from ${lift(tableName)} where id in ${List(1L)}".as[String].select.runCollect
+          } yield assertTrue(results == Chunk("one"))
+        },
+        test("should handle lifted values in cqlt") {
+          val tableName = "tests.test_data"
+          for {
+            query   <- cqlt"select data from ${lift(tableName)} where id in ${Put[List[Long]]}".as[String].prepare
+            results <- query(List(1L)).select.runCollect
+          } yield assertTrue(results == Chunk("one"))
         }
       )
     )
