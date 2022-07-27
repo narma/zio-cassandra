@@ -22,12 +22,12 @@ package object cql {
       * import unsafe._
       *
       * private val tableName = "my_table"
-      * def selectById(ids: Seq[Long) = cql"select id from ${lift(tableName)} where id in $ids".as[Int]
+      * def selectById(ids: Seq[Long]) = cql"select id from \${lift(tableName)} where id in \$ids".as[Int]
       * }}}
       * instead of
       * {{{
       * private val tableName = "my_table"
-      * def selectById(ids: Seq[Long) = (cqlConst"select id from $tableName" ++  cql"where id in $ids").as[Int]
+      * def selectById(ids: Seq[Long]) = (cqlConst"select id from \$tableName" ++  cql"where id in \$ids").as[Int]
       * }}}
       */
     def lift(value: Any): LiftedValue = LiftedValue(value)
