@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, zio-1.x ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, zio-1.x ]
 
 jobs:
   build:
@@ -19,5 +19,7 @@ jobs:
         with:
             docker_channel: stable
             docker_version: 20.10
+      - name: Validate Scaladoc
+        run: sbt doc
       - name: Run tests
         run: sbt test +IntegrationTest/test
