@@ -180,38 +180,38 @@ VALUES (3, {data: 'three', count: 30, flag: true, dataset: {300, 301, 302}, data
 INSERT INTO tests.udt_reads_type_test (id, udt)
 VALUES (4, {data: 'four'});
 
-CREATE TYPE tests.udt_for_udt_reads_default_name_test(
+CREATE TYPE tests.udt_for_udt_codec_default_name_test(
     allupper text,
     alllower text,
     somename text,
     somelongname text
     );
 
-CREATE TABLE tests.udt_reads_default_name_test
+CREATE TABLE tests.udt_codec_default_name_test
 (
     id  bigint,
-    udt udt_for_udt_reads_default_name_test,
+    udt udt_for_udt_codec_default_name_test,
     PRIMARY KEY (id)
 );
 
-INSERT INTO tests.udt_reads_default_name_test (id, udt)
+INSERT INTO tests.udt_codec_default_name_test (id, udt)
 VALUES (0, {allupper: 'ALL-UPPER', alllower: 'all-lower', somename: 'some-name', somelongname: 'some-long-name'});
 
-CREATE TYPE tests.udt_for_udt_reads_snake_name_test(
+CREATE TYPE tests.udt_for_udt_codec_snake_name_test(
     allupper text,
     alllower text,
     some_name text,
     some_long_name text
     );
 
-CREATE TABLE tests.udt_reads_snake_name_test
+CREATE TABLE tests.udt_codec_snake_name_test
 (
     id  bigint,
-    udt udt_for_udt_reads_snake_name_test,
+    udt udt_for_udt_codec_snake_name_test,
     PRIMARY KEY (id)
 );
 
-INSERT INTO tests.udt_reads_snake_name_test (id, udt)
+INSERT INTO tests.udt_codec_snake_name_test (id, udt)
 VALUES (0, {allupper: 'ALL-UPPER', alllower: 'all-lower', some_name: 'some-name', some_long_name: 'some-long-name'});
 
 CREATE TABLE tests.nullable_collection_tests
