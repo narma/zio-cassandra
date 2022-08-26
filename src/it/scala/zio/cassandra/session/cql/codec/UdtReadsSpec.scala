@@ -64,7 +64,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
         session <- ZIO.service[Session]
         result  <- session
                      .selectFirst(
-                       s"select id, udt FROM $keyspace.udt_reads_default_name_test"
+                       s"select id, udt FROM $keyspace.udt_codec_default_name_test"
                      )
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
@@ -76,7 +76,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
         session <- ZIO.service[Session]
         result  <- session
                      .selectFirst(
-                       s"select udt, id FROM $keyspace.udt_reads_default_name_test"
+                       s"select udt, id FROM $keyspace.udt_codec_default_name_test"
                      )
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
@@ -86,7 +86,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
         session <- ZIO.service[Session]
         result  <- session
                      .selectFirst(
-                       s"select id, udt FROM $keyspace.udt_reads_snake_name_test"
+                       s"select id, udt FROM $keyspace.udt_codec_snake_name_test"
                      )
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
@@ -96,7 +96,7 @@ object UdtReadsSpec extends CassandraSpecUtils {
         session <- ZIO.service[Session]
         result  <- session
                      .selectFirst(
-                       s"select udt, id FROM $keyspace.udt_reads_snake_name_test"
+                       s"select udt, id FROM $keyspace.udt_codec_snake_name_test"
                      )
                      .flatMap(readOpt[NameTestData](_))
       } yield assertTrue(result.contains(nameTestData))
