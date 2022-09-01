@@ -1,7 +1,7 @@
 package zio.cassandra.session.cql.codec
 
 import com.datastax.oss.driver.api.core.ProtocolVersion
-import com.datastax.oss.driver.api.core.`type`.codec.TypeCodecs
+import com.datastax.oss.driver.api.core.`type`.codec.{ ExtraTypeCodecs, TypeCodecs }
 import com.datastax.oss.driver.api.core.`type`.codec.registry.CodecRegistry
 import com.datastax.oss.driver.api.core.`type`.{ DataType, UserDefinedType }
 import com.datastax.oss.driver.api.core.data.UdtValue
@@ -64,6 +64,7 @@ trait CellWritesInstances1 extends CellWritesInstances2 {
   implicit val uuidCellWrites: CellWrites[UUID] = instance_(TypeCodecs.UUID.encode)
 
   implicit val byteBufferCellWrites: CellWrites[ByteBuffer] = instance_(TypeCodecs.BLOB.encode)
+  implicit val byteArrayCellWrites: CellWrites[Array[Byte]] = instance_(ExtraTypeCodecs.BLOB_TO_ARRAY.encode)
 
   private def instance_[T](f: (T, ProtocolVersion) => ByteBuffer): CellWrites[T] =
     instance((t, p) => f(t, p))
