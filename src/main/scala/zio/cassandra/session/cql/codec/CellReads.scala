@@ -2,7 +2,7 @@ package zio.cassandra.session.cql.codec
 
 import com.datastax.oss.driver.api.core.ProtocolVersion
 import com.datastax.oss.driver.api.core.`type`.DataType
-import com.datastax.oss.driver.api.core.`type`.codec.TypeCodecs
+import com.datastax.oss.driver.api.core.`type`.codec.{ ExtraTypeCodecs, TypeCodecs }
 import com.datastax.oss.driver.api.core.`type`.codec.registry.CodecRegistry
 import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
@@ -64,6 +64,7 @@ trait CellReadsInstances1 extends CellReadsInstances2 {
   implicit val uuidCellReads: CellReads[UUID] = withCheckedNull(TypeCodecs.UUID.decode)
 
   implicit val byteBufferCellReads: CellReads[ByteBuffer] = withCheckedNull(TypeCodecs.BLOB.decode)
+  implicit val byteArrayCellReads: CellReads[Array[Byte]] = withCheckedNull(ExtraTypeCodecs.BLOB_TO_ARRAY.decode)
 
   private def withCheckedNull[T](f: (ByteBuffer, ProtocolVersion) => T): CellReads[T] =
     instance { (bytes, protocol) =>
