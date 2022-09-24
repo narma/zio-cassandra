@@ -1,10 +1,10 @@
 package zio.cassandra.session.cql.query
 
 import com.datastax.oss.driver.api.core.cql.BoundStatement
-import zio.{ Task, ZIO }
-import zio.stream.Stream
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql.codec.Reads
+import zio.stream.Stream
+import zio.{ Task, ZIO }
 
 class Query[R: Reads] private[cql] (
   session: Session,
