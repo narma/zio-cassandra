@@ -6,7 +6,7 @@ import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql.codec.Reads
 
-class PreparedQuery[V <: HList: Binder, R: Reads] private[cql] (
+class PreparedQuery[V <: HList: Binder, R: Reads] private[session] (
   session: Session,
   statement: PreparedStatement,
   config: BoundStatement => BoundStatement
