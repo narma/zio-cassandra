@@ -70,6 +70,11 @@ class ServiceImpl(session: Session) extends Service {
 
   override def put(value: Model) = insertQuery(value).execute.unit.provide(ZLayer.succeed(session))
   override def get(id: Int) = selectQuery(id).selectFirst.provideSome(ZLayer.succeed(session))
+
+  // alternatively, to avoid providing environment each time
+  def insert(value: Model) = session.execute(insertQuery(value)).unit
+  def select(id: Int) = session.selectFirst(selectQuery(id))
+
 }
 ```
 

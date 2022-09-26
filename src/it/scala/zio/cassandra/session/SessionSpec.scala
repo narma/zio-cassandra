@@ -4,11 +4,14 @@ import com.datastax.oss.driver.api.core.CqlSession
 import com.datastax.oss.driver.api.core.cql.SimpleStatement
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException
 import com.dimafeng.testcontainers.CassandraContainer
+import zio.cassandra.session.cql.CqlStringContext
+import zio.cassandra.session.cql.unsafe.lift
 import zio.test.Assertion._
 import zio.test._
 import zio.{ Chunk, Scope, ZIO }
 
 import java.net.InetSocketAddress
+import java.util.UUID
 
 object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
 
@@ -54,6 +57,23 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                      .runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
+    test("select interpolated query (cqlConst) should return prepared data") {
+      for {
+        session <- ZIO.service[Session]
+        results <- session
+                     .select(cqlConst"select data FROM $keyspace.test_data WHERE id IN (1,2,3)".as[String])
+                     .runCollect
+      } yield assertTrue(results == Chunk("one", "two", "three"))
+    },
+    test("select interpolated query (cql) should return prepared data") {
+      for {
+        session <- ZIO.service[Session]
+        ids      = List(1L, 2L, 3L)
+        results <- session
+                     .select(cql"select data FROM ${lift(keyspace)}.test_data WHERE id IN $ids".as[String])
+                     .runCollect
+      } yield assertTrue(results == Chunk("one", "two", "three"))
+    },
     test("select should be pure stream") {
       for {
         session     <- ZIO.service[Session]
@@ -65,7 +85,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
         results     <- selectStream
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
-    test("selectOne should return None on empty result") {
+    test("selectFirst should return None on empty result") {
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -73,7 +93,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                      .map(_.map(_.getString(0)))
       } yield assertTrue(result.isEmpty)
     },
-    test("selectOne should return Some for one") {
+    test("selectFirst should return Some for one") {
       for {
         session <- ZIO.service[Session]
         result  <- session
@@ -87,6 +107,19 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                     .selectFirst(s"select data FROM $keyspace.test_data WHERE id = 0")
                     .map(_.map(_.getString(0)))
       } yield assertTrue(result.contains(null))
+    },
+    test("selectFirst interpolated query (cqlConst) should return Some") {
+      for {
+        session <- ZIO.service[Session]
+        result  <- session.selectFirst(cqlConst"select data FROM $keyspace.test_data WHERE id = 1".as[String])
+      } yield assertTrue(result.contains("one"))
+    },
+    test("selectFirst interpolated query (cql) should return Some") {
+      for {
+        session <- ZIO.service[Session]
+        id       = 1L
+        result  <- session.selectFirst(cql"select data FROM ${lift(keyspace)}.test_data WHERE id = $id".as[String])
+      } yield assertTrue(result.contains("one"))
     },
     test("select will emit in chunks sized equal to statement pageSize") {
       val st = SimpleStatement.newInstance(s"select data from $keyspace.test_data").setPageSize(2)
@@ -102,6 +135,13 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
         session <- ZIO.service[Session]
         results <- session.select(st).map(_.getString(0)).runCollect
       } yield assert(results)(hasSameElements(Chunk("one", "two", "three")))
+    },
+    test("execute will create a table") {
+      for {
+        session  <- ZIO.service[Session]
+        table     = UUID.randomUUID().toString.replaceAll("-", "_")
+        created  <- session.execute(cqlConst"create table $keyspace.$table(id text primary key)")
+      } yield assertTrue(created)
     }
   )
 }

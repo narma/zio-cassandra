@@ -8,17 +8,14 @@ import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.cql.codec.Reads
 import zio.{ RIO, ZIO }
 
-case class QueryTemplate[V <: HList: Binder, R: Reads] private[cql] (
+case class QueryTemplate[V <: HList, R] private[cql] (
   query: String,
   config: BoundStatement => BoundStatement
-) {
+)(implicit val binder: Binder[V], val reads: Reads[R]) {
   def +(that: String): QueryTemplate[V, R] = QueryTemplate[V, R](this.query + that, config)
   def as[R1: Reads]: QueryTemplate[V, R1]  = QueryTemplate[V, R1](query, config)
 
-  def prepare: RIO[Session, PreparedQuery[V, R]] =
-    ZIO.serviceWithZIO { session =>
-      session.prepare(query).map(new PreparedQuery(session, _, config))
-    }
+  def prepare: RIO[Session, PreparedQuery[V, R]] = ZIO.serviceWithZIO(_.prepare(this))
 
   def config(config: BoundStatement => BoundStatement): QueryTemplate[V, R] =
     QueryTemplate[V, R](this.query, this.config andThen config)
