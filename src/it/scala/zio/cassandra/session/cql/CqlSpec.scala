@@ -64,12 +64,26 @@ object CqlSpec {
         results <- getDataByIds(List(1, 2, 3)).select.runCollect
       } yield assertTrue(results == Chunk("one", "two", "three"))
     },
+    testM("interpolated select should return small tuples from migration") {
+      def getAllByIds(ids: List[Long]) = cql"select id FROM tests.test_data WHERE id in $ids".as[Tuple1[Long]]
+      for {
+        results <- getAllByIds(List(1, 2, 3)).config(_.setQueryTimestamp(0L)).select.runCollect
+      } yield assertTrue(results == Chunk(Tuple1(1L), Tuple1(2L), Tuple1(3L)))
+    },
     testM("interpolated select should return tuples from migration") {
       def getAllByIds(ids: List[Long]) =
         cql"select id, data FROM tests.test_data WHERE id in $ids".as[(Long, String)]
       for {
         results <- getAllByIds(List(1, 2, 3)).config(_.setQueryTimestamp(0L)).select.runCollect
       } yield assertTrue(results == Chunk((1L, "one"), (2L, "two"), (3L, "three")))
+    },
+    testM("interpolated select should return large tuple from migration") {
+      def getAllByIds(ids: List[Long]) =
+        cql"select id, data, count, dataset, id, data, count, dataset FROM tests.test_data WHERE id in $ids"
+          .as[(Long, String, Int, Set[Int], Long, String, Int, Set[Int])]
+      for {
+        result <- getAllByIds(List(2)).config(_.setQueryTimestamp(0L)).selectFirst
+      } yield assertTrue(result.contains((2L, "two", 20, Set(201), 2L, "two", 20, Set(201))))
     },
     testM("interpolated select should return tuples from migration with multiple binding") {
       def getAllByIds(id1: Long, id2: Int) =

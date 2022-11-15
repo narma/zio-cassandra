@@ -22,4 +22,4 @@ jobs:
       - name: Validate Scaladoc
         run: sbt doc
       - name: Run tests
-        run: sbt test +IntegrationTest/test
+        run: sbt +test +IntegrationTest/test
