@@ -1,5 +1,6 @@
 package zio.cassandra.session.cql.codec
 
+import com.datastax.oss.driver.api.core.cql.Row
 import zio.cassandra.session.{ Session, ZIOCassandraSpec, ZIOCassandraSpecUtils }
 import zio.test.Assertion.hasSameElements
 import zio.test._
@@ -21,9 +22,13 @@ object ReadsSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
 
   final case class NameTestData(id: BigInt, ALLUPPER: String, alllower: String, someName: String, someLongName: String)
 
+  final case class ReadsCacheTestData(id: BigInt)
+
   final case class NullableCollectionsTestData(id: Int, regularList: Seq[Int], frozenList: Seq[Int])
 
   private val nameTestData = NameTestData(0, "ALL-UPPER", "all-lower", "some-name", "some-long-name")
+
+  private val readsCacheTestData = ReadsCacheTestData(0)
 
   val spec: Spec[Session, Throwable] = suite("Reads")(
     test("should read simple data types") {
@@ -115,6 +120,19 @@ object ReadsSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                      .mapZIO(read[NullableCollectionsTestData](_))
                      .runCollect
       } yield assertTrue(result.forall(d => d.regularList.isEmpty && d.frozenList.isEmpty))
+    },
+    test("should read row using row reads") {
+      for {
+        session <- ZIO.service[Session]
+        _       <- session.selectFirst(s"select id FROM $keyspace.reads_type_test").flatMap(readOpt[Row](_))
+      } yield assertCompletes
+    },
+    test("should read row using cached reader (which can be marked as implicit)") {
+      implicit val reads: Reads[ReadsCacheTestData] = Reads.derive
+      for {
+        session <- ZIO.service[Session]
+        result  <- session.selectFirst(s"select id FROM $keyspace.reads_type_test where id = 0")
+      } yield assertTrue(result.map(reads.read).contains(readsCacheTestData))
     }
   )
 
