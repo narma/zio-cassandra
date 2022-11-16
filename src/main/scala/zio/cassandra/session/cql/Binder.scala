@@ -2,7 +2,7 @@ package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.data.{ SettableByIndex, UdtValue }
-import shapeless.{ ::, HList, HNil, Widen }
+import shapeless.{ ::, HList, HNil }
 import zio.cassandra.session.cql.codec.CellWrites
 
 import scala.annotation.implicitNotFound
@@ -24,11 +24,6 @@ trait Binder[T] { self =>
 object Binder extends BinderLowerPriority with BinderLowestPriority {
 
   def apply[T](implicit binder: Binder[T]): Binder[T] = binder
-
-  implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
-    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: X): S =
-      Binder[T].bind(statement, index, wd.apply(value))
-  }
 
   final implicit class UdtValueBinderOps(private val udtBinder: Binder[UdtValue]) extends AnyVal {
 

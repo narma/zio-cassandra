@@ -9,7 +9,7 @@ import zio.cassandra.session.cql.codec.Reads
 import zio.stream.{ Stream, ZStream }
 import zio.{ Has, RIO, ZIO }
 
-case class ParameterizedQuery[V <: HList: Binder, R: Reads] private (template: QueryTemplate[V, R], values: V) {
+case class ParameterizedQuery[V <: HList: Binder, R: Reads](template: QueryTemplate[V, R], values: V) {
   def +(that: String): ParameterizedQuery[V, R] = ParameterizedQuery[V, R](this.template + that, this.values)
   def as[R1: Reads]: ParameterizedQuery[V, R1]  = ParameterizedQuery[V, R1](template.as[R1], values)
 
