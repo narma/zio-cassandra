@@ -7,14 +7,12 @@ import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
 import zio.cassandra.session.cql.query.{ PreparedQuery, QueryTemplate }
-import zio.macros.accessible
 import zio.stream.ZStream.Pull
 import zio.stream.{ Stream, ZStream }
 
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
-@accessible
 trait Session {
 
   def prepare(stmt: String): Task[PreparedStatement]
@@ -121,7 +119,7 @@ object Session {
       .acquireRelease(ZIO.fromCompletionStage(builder.buildAsync())) { session =>
         ZIO.fromCompletionStage(session.closeAsync()).orDie
       }
-      .map(Live)
+      .map(Live(_))
 
   def existing(session: CqlSession): Session =
     Live(session)

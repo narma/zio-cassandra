@@ -4,7 +4,7 @@ object Dependencies {
 
   object V {
     val scala2   = "2.13.8"
-    val scala3   = "3.1.3"
+    val scala3   = "3.2.1"
     val allScala = Seq(scala2, scala3)
 
     val cassandraDriverVersion = "4.14.1"
