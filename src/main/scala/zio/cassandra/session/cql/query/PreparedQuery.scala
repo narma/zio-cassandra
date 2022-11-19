@@ -1,15 +1,38 @@
 package zio.cassandra.session.cql.query
 
 import com.datastax.oss.driver.api.core.cql.{ BoundStatement, PreparedStatement }
-import shapeless.{ HList, ProductArgs }
-import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql.codec.Reads
+import zio.stream.Stream
+import zio.{ Task, ZIO }
 
-class PreparedQuery[V <: HList: Binder, R: Reads] private[session] (
+class PreparedQuery[R: Reads] private[cql] (
   session: Session,
-  statement: PreparedStatement,
-  config: BoundStatement => BoundStatement
-) extends ProductArgs {
-  def applyProduct(values: V) = new Query[R](session, Binder[V].bind(config(statement.bind()), 0, values))
+  private[cql] val statement: BoundStatement
+) {
+
+  def config(statement: BoundStatement => BoundStatement) = new PreparedQuery[R](session, statement(this.statement))
+
+  def select: Stream[Throwable, R] = session.select(statement).mapChunksM { chunk =>
+    chunk.mapM(row => Task(Reads[R].read(row)))
+  }
+
+  def selectFirst: Task[Option[R]] = session.selectFirst(statement).flatMap {
+    case None      => ZIO.none
+    case Some(row) => Task(Reads[R].read(row)).map(Some(_))
+  }
+
+  def execute: Task[Boolean] = session.execute(statement).map(_.wasApplied)
+
+}
+
+object PreparedQuery {
+
+  private[session] def apply[R: Reads](
+    session: Session,
+    statement: PreparedStatement,
+    config: BoundStatement => BoundStatement
+  ): PreparedQuery[R] =
+    new PreparedQuery[R](session, config(statement.bind()))
+
 }

@@ -5,9 +5,8 @@ import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
-import shapeless.HList
 import zio._
-import zio.cassandra.session.cql.query.{ ParameterizedQuery, PreparedQuery, Query, QueryTemplate }
+import zio.cassandra.session.cql.query.{ PreparedQuery, QueryTemplate }
 import zio.macros.accessible
 import zio.stream.Stream
 import zio.stream.ZStream.Pull
@@ -29,22 +28,19 @@ trait Session {
   // short-cuts
   def selectFirst(stmt: Statement[_]): Task[Option[Row]]
 
-  final def prepare[V <: HList, R](query: QueryTemplate[V, R]): Task[PreparedQuery[V, R]] = {
-    import query.{ binder, reads }
-    prepare(query.query).map(new PreparedQuery[V, R](this, _, query.config))
+  final def prepare[R](query: QueryTemplate[R]): Task[PreparedQuery[R]] = {
+    import query.reads
+    prepare(query.query).map(PreparedQuery[R](this, _, query.config))
   }
 
-  final def prepare[V <: HList, R](query: ParameterizedQuery[V, R]): Task[Query[R]] =
-    prepare(query.template).map(_.applyProduct(query.values))
+  final def execute(template: QueryTemplate[_]): Task[Boolean] =
+    prepare(template).flatMap(_.execute)
 
-  final def execute[V <: HList](query: ParameterizedQuery[V, _]): Task[Boolean] =
-    prepare(query).flatMap(_.execute)
+  final def select[R](template: QueryTemplate[R]): Stream[Throwable, R] =
+    Stream.fromEffect(prepare(template)).flatMap(_.select)
 
-  final def select[V <: HList, R](query: ParameterizedQuery[V, R]): Stream[Throwable, R] =
-    Stream.fromEffect(prepare(query)).flatMap(_.select)
-
-  final def selectFirst[V <: HList, R](query: ParameterizedQuery[V, R]): Task[Option[R]] =
-    prepare(query).flatMap(_.selectFirst)
+  final def selectFirst[R](template: QueryTemplate[R]): Task[Option[R]] =
+    prepare(template).flatMap(_.selectFirst)
 
   // other methods
   def metrics: Option[Metrics]
