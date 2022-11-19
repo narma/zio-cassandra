@@ -78,47 +78,6 @@ class ServiceImpl(session: Session) extends Service {
 }
 ```
 
-### Templated syntax
-
-When you want control your prepared statements manually.
-
-```scala
-import zio._
-import zio.cassandra.session.Session
-import zio.cassandra.session.cql._
-import zio.stream._
-
-case class Model(id: Int, data: String)
-
-trait Service {
-  def put(value: Model): Task[Unit]
-
-  def get(id: Int): Task[Option[Model]]
-
-  def getAll(): Stream[Throwable, Model]
-}
-
-object Service {
-
-  private val insertQuery = cqlt"insert into table (id, data) values (${Put[Int]}, ${Put[String]})"
-    .config(_.setTimeout(1.second))
-  private val selectQuery = cqlt"select id, data from table where id = ${Put[Int]}".as[Model]
-  private val selectAllQuery = cqlt"select id, data from table".as[Model]
-
-  def apply(session: Session) = for {
-    insert <- insertQuery.prepare
-    select <- selectQuery.prepare
-    selectAll <- selectAllQuery.prepare
-  } yield new Service {
-    override def put(value: Model) = insert(value.id, value.data).execute.unit.provide(ZLayer.succeed(session))
-
-    override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).selectFirst
-
-    override def getAll() = selectAll().config(_.setExecutionProfileName("default")).select
-  }
-}
-```
-
 ## User Defined Type (UDT) support
 
 zio.cassandra.cql provides support for Cassandra's User Defined Type (UDT) values.
