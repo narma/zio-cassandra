@@ -4,7 +4,6 @@ import com.datastax.oss.driver.api.core.ConsistencyLevel
 import zio.cassandra.session.{ Session, ZIOCassandraSpec }
 import zio.cassandra.session.cql.codec.UnexpectedNullValue
 import zio.cassandra.session.cql.unsafe.lift
-import zio.stream.ZStream
 import zio.test.Assertion._
 import zio.test.TestAspect.ignore
 import zio.test._
@@ -56,59 +55,6 @@ object CqlSpec extends ZIOCassandraSpec {
   }
 
   val spec: Spec[Session, Throwable] = suite("cql suite")(
-    test("interpolated select template should return data from migration") {
-      for {
-        prepared <- cqlt"select data FROM tests.test_data WHERE id in ${Put[List[Long]]}"
-                      .as[String]
-                      .config(_.setTimeout(1.seconds))
-                      .prepare
-        query     = prepared(List[Long](1, 2, 3))
-        results  <- query.select.runCollect
-      } yield assertTrue(results == Chunk("one", "two", "three"))
-    },
-    test("interpolated select template should return tuples from migration") {
-      for {
-        prepared <- cqlt"select id, data, dataset FROM tests.test_data WHERE id in ${Put[List[Long]]}"
-                      .as[(Long, String, Option[Set[Int]])]
-                      .prepare
-        query     = prepared(List[Long](1, 2, 3))
-        results  <- query.select.runCollect
-      } yield assertTrue {
-        results == Chunk((1L, "one", Some(Set.empty[Int])), (2L, "two", Some(Set(201))), (3L, "three", None))
-      }
-    },
-    test("interpolated select template should return tuples from migration with multiple binding") {
-      for {
-        query   <-
-          cqlt"select data FROM tests.test_data_multiple_keys WHERE id1 = ${Put[Long]} and id2 = ${Put[Int]}"
-            .as[String]
-            .prepare
-        results <- query(1L, 2).config(_.setExecutionProfileName("default")).select.runCollect
-      } yield assertTrue(results == Chunk("one-two"))
-    },
-    test(
-      "interpolated select template should return tuples from migration with multiple binding and margin stripped"
-    ) {
-      for {
-        query   <- cqlt"""select data FROM tests.test_data_multiple_keys
-                       |WHERE id1 = ${Put[Long]} and id2 = ${Put[Int]}""".stripMargin.as[String].prepare
-        results <- query(1L, 2).config(_.setExecutionProfileName("default")).select.runCollect
-      } yield assertTrue(results == Chunk("one-two"))
-    },
-    test("interpolated select template should return data case class from migration") {
-      for {
-        prepared <-
-          cqlt"select id, data FROM tests.test_data WHERE id in ${Put[List[Long]]}".as[Data].prepare
-        query     = prepared(List[Long](1, 2, 3))
-        results  <- query.select.runCollect
-      } yield assertTrue(results == Chunk(Data(1, "one"), Data(2, "two"), Data(3, "three")))
-    },
-    test("interpolated select template should be reusable") {
-      for {
-        query  <- cqlt"select data FROM tests.test_data WHERE id = ${Put[Long]}".as[String].prepare
-        result <- ZStream.fromIterable(Seq(1L, 2L, 3L)).flatMap(i => query(i).select).runCollect
-      } yield assertTrue(result == Chunk("one", "two", "three"))
-    },
     test("interpolated select should return data from migration") {
       def getDataByIds(ids: List[Long]) =
         cql"select data FROM tests.test_data WHERE id in $ids"
@@ -462,13 +408,6 @@ object CqlSpec extends ZIOCassandraSpec {
         val tableName = "tests.test_data"
         for {
           results <- cql"select data from ${lift(tableName)} where id in ${List(1L)}".as[String].select.runCollect
-        } yield assertTrue(results == Chunk("one"))
-      },
-      test("should handle lifted values in cqlt") {
-        val tableName = "tests.test_data"
-        for {
-          query   <- cqlt"select data from ${lift(tableName)} where id in ${Put[List[Long]]}".as[String].prepare
-          results <- query(List(1L)).select.runCollect
         } yield assertTrue(results == Chunk("one"))
       }
     )
