@@ -1,40 +1,37 @@
 package zio.cassandra.session.cql.query
 
 import com.datastax.oss.driver.api.core.cql.BoundStatement
-import shapeless.HList
-import shapeless.ops.hlist.Prepend
 import zio.cassandra.session.Session
-import zio.cassandra.session.cql.Binder
 import zio.cassandra.session.cql.codec.Reads
+import zio.stream.ZStream
 import zio.{ Has, RIO, ZIO }
 
-case class QueryTemplate[V <: HList, R] private[cql] (
+case class QueryTemplate[R] private[cql] (
   query: String,
   config: BoundStatement => BoundStatement
-)(implicit val binder: Binder[V], val reads: Reads[R]) {
-  def +(that: String): QueryTemplate[V, R] = QueryTemplate[V, R](this.query + that, config)
-  def as[R1: Reads]: QueryTemplate[V, R1]  = QueryTemplate[V, R1](query, config)
+)(implicit val reads: Reads[R]) {
+  def +(that: String): QueryTemplate[R] = QueryTemplate[R](this.query + that, config)
+  def as[R1: Reads]: QueryTemplate[R1]  = QueryTemplate[R1](query, config)
 
-  def prepare: RIO[Has[Session], PreparedQuery[V, R]] = ZIO.serviceWith(_.prepare(this))
+  def prepare: RIO[Has[Session], PreparedQuery[R]] = ZIO.serviceWith(_.prepare(this))
 
-  def config(config: BoundStatement => BoundStatement): QueryTemplate[V, R] =
-    QueryTemplate[V, R](this.query, this.config andThen config)
+  def select: ZStream[Has[Session], Throwable, R] = ZStream.serviceWithStream(_.select(this))
 
-  def stripMargin: QueryTemplate[V, R] = QueryTemplate[V, R](this.query.stripMargin, this.config)
+  def selectFirst: RIO[Has[Session], Option[R]] = ZIO.serviceWith(_.selectFirst(this))
 
-  def ++[W <: HList, Out <: HList](that: QueryTemplate[W, R])(implicit
-    prepend: Prepend.Aux[V, W, Out],
-    binderForW: Binder[W],
-    binderForOut: Binder[Out]
-  ): QueryTemplate[Out, R] = concat(that)
+  def execute: RIO[Has[Session], Boolean] = ZIO.serviceWith(_.execute(this))
 
-  def concat[W <: HList, Out <: HList](that: QueryTemplate[W, R])(implicit
-    prepend: Prepend.Aux[V, W, Out],
-    binderForW: Binder[W],
-    binderForOut: Binder[Out]
-  ): QueryTemplate[Out, R] = QueryTemplate[Out, R](
-    this.query + that.query,
-    statement => (this.config andThen that.config)(statement)
-  )
+  def config(config: BoundStatement => BoundStatement): QueryTemplate[R] =
+    QueryTemplate[R](this.query, this.config andThen config)
+
+  def stripMargin: QueryTemplate[R] = QueryTemplate[R](this.query.stripMargin, this.config)
+
+  def ++(that: QueryTemplate[R]): QueryTemplate[R] = concat(that)
+
+  def concat(that: QueryTemplate[R]): QueryTemplate[R] =
+    QueryTemplate[R](
+      this.query + that.query,
+      statement => (this.config andThen that.config)(statement)
+    )
 
 }

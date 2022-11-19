@@ -2,7 +2,6 @@ package zio.cassandra.session.cql
 
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.data.{ SettableByIndex, UdtValue }
-import shapeless.{ ::, HList, HNil, Widen }
 import zio.cassandra.session.cql.codec.CellWrites
 
 import scala.annotation.implicitNotFound
@@ -21,14 +20,9 @@ trait Binder[T] { self =>
 
 }
 
-object Binder extends BinderLowerPriority with BinderLowestPriority {
+object Binder extends BinderLowerPriority {
 
   def apply[T](implicit binder: Binder[T]): Binder[T] = binder
-
-  implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
-    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: X): S =
-      Binder[T].bind(statement, index, wd.apply(value))
-  }
 
   final implicit class UdtValueBinderOps(private val udtBinder: Binder[UdtValue]) extends AnyVal {
 
@@ -83,18 +77,4 @@ trait BinderLowerPriority {
     }
   }
 
-}
-
-trait BinderLowestPriority {
-  implicit val hNilBinder: Binder[HNil] = new Binder[HNil] {
-    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: HNil): S = statement
-  }
-
-  implicit def hConsBinder[H: Binder, T <: HList: Binder]: Binder[H :: T] = new Binder[H :: T] {
-    override def bind[S <: SettableByIndex[S]](statement: S, index: Int, value: H :: T): S = {
-      val applied   = Binder[H].bind(statement, index, value.head)
-      val nextIndex = Binder[H].nextIndex(index)
-      Binder[T].bind(applied, nextIndex, value.tail)
-    }
-  }
 }

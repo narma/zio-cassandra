@@ -132,7 +132,7 @@ object SessionSpec extends CassandraSpecUtils {
     testM("execute will create a table") {
       for {
         session <- ZIO.service[Session]
-        table    = UUID.randomUUID().toString.replaceAll("-", "_")
+        table    = "table_" +UUID.randomUUID().toString.replaceAll("-", "_")
         created <- session.execute(cqlConst"create table $keyspace.$table(id text primary key)")
       } yield assertTrue(created)
     }
