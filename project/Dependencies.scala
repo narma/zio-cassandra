@@ -3,16 +3,16 @@ import sbt._
 object Dependencies {
 
   object V {
-    val scala2   = "2.13.8"
+    val scala2   = "2.13.10"
     val scala3   = "3.2.1"
     val allScala = Seq(scala2, scala3)
   }
 
-  val cassandraDriverVersion = "4.14.1"
+  val cassandraDriverVersion = "4.15.0"
 
-  val zioVersion = "1.0.16"
+  val zioVersion = "1.0.17"
 
-  val testContainersVersion = "0.40.8"
+  val testContainersVersion = "0.40.11"
 
   val cassandraDependencies = Seq(
     "com.datastax.oss" % "java-driver-core" % cassandraDriverVersion % "provided"
@@ -30,11 +30,11 @@ object Dependencies {
   ).map(_ % "it,test")
 
   val testIntegrationDeps = Seq(
-    "org.wvlet.airframe" %% "airframe-log"                   % "22.6.1",
-    "org.slf4j"           % "slf4j-jdk14"                    % "1.7.36",
+    "org.wvlet.airframe" %% "airframe-log"                   % "22.11.0",
+    "org.slf4j"           % "slf4j-jdk14"                    % "2.0.3",
     "com.dimafeng"       %% "testcontainers-scala-core"      % testContainersVersion,
     "com.dimafeng"       %% "testcontainers-scala-cassandra" % testContainersVersion,
-    "org.testcontainers"  % "testcontainers"                 % "1.17.2"
+    "org.testcontainers"  % "testcontainers"                 % "1.17.4"
   ).map(_ % "it")
 
 }
