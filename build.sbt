@@ -22,7 +22,7 @@ testFrameworks := Seq(new TestFramework("zio.test.sbt.ZTestFramework"))
 
 def shapelessDeps(scalaVersion: String) = CrossVersion.partialVersion(scalaVersion) match {
   case Some((3, _)) => Nil
-  case _            => Seq("com.chuusai" %% "shapeless" % "2.3.9")
+  case _            => Seq("com.chuusai" %% "shapeless" % "2.3.10")
 }
 
 lazy val root =
