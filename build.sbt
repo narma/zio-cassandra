@@ -7,6 +7,7 @@ inThisBuild(
   List(
     organization           := "st.alzo",
     scalaVersion           := V.scala2,
+    crossScalaVersions     := V.allScala,
     licenses += ("Apache-2.0", url("https://www.apache.org/licenses/LICENSE-2.0")),
     developers             := List(
       Developer("jsfwa", "jsfwa", "zubrilinandrey@gmail.com", url("https://gitlab.com/jsfwa")),

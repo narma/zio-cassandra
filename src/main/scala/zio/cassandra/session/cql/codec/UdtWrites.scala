@@ -1,9 +1,6 @@
 package zio.cassandra.session.cql.codec
 
 import com.datastax.oss.driver.api.core.data.UdtValue
-import shapeless._
-import shapeless.labelled.FieldType
-import zio.cassandra.session.cql.codec.UdtWrites._
 
 /** Serializer created specifically for UDT values.<br> Note that this reader can be (is) recursive, so each instance of
   * [[zio.cassandra.session.cql.codec.UdtWrites]] can be seen as an instance of
@@ -32,32 +29,5 @@ object UdtWrites extends UdtWritesInstances1 {
     def contramap[V](f: V => T): UdtWrites[V] = instance((t, structure) => writes.write(f(t), structure))
 
   }
-
-}
-
-trait UdtWritesInstances1 {
-
-  implicit val hNilUdtWrites: UdtWrites[HNil] = instance((_, udtValue) => udtValue)
-
-  implicit def hConsUdtWrites[K <: Symbol, H, T <: HList](implicit
-    configuration: Configuration,
-    hWrites: Lazy[CellWrites[H]],
-    tWrites: UdtWrites[T],
-    fieldNameW: Witness.Aux[K]
-  ): UdtWrites[FieldType[K, H] :: T] =
-    instance { (t, udtValue) =>
-      val fieldName  = configuration.transformFieldNames(fieldNameW.value.name)
-      val hType      = udtValue.getType(fieldName)
-      val hBytes     = hWrites.value.write(t.head, udtValue.protocolVersion(), hType)
-      val valueWithH = udtValue.setBytesUnsafe(fieldName, hBytes)
-      tWrites.write(t.tail, valueWithH)
-    }
-
-  implicit def genericUdtWrites[T, Repr](implicit
-    configuration: Configuration,
-    gen: LabelledGeneric.Aux[T, Repr],
-    writes: Lazy[UdtWrites[Repr]]
-  ): UdtWrites[T] =
-    instance((t, udtValue) => writes.value.write(gen.to(t), udtValue))
 
 }
