@@ -6,7 +6,7 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
-import zio.cassandra.session.cql.query.{ PreparedQuery, QueryTemplate }
+import zio.cassandra.session.cql.query.{ Batch, PreparedQuery, QueryTemplate }
 import zio.stream.Stream
 import zio.stream.ZStream.Pull
 
@@ -33,6 +33,9 @@ trait Session {
 
   final def execute(template: QueryTemplate[_]): Task[Boolean] =
     prepare(template).flatMap(_.execute)
+
+  final def execute(batch: Batch): Task[Boolean] =
+    execute(batch.build).map(_.wasApplied)
 
   final def select[R](template: QueryTemplate[R]): Stream[Throwable, R] =
     Stream.fromEffect(prepare(template)).flatMap(_.select)
