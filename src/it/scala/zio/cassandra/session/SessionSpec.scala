@@ -5,6 +5,7 @@ import com.datastax.oss.driver.api.core.cql.SimpleStatement
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException
 import com.dimafeng.testcontainers.CassandraContainer
 import zio.cassandra.session.cql.CqlStringContext
+import zio.cassandra.session.cql.query.Batch
 import zio.cassandra.session.cql.unsafe.lift
 import zio.test.Assertion._
 import zio.test._
@@ -104,7 +105,7 @@ object SessionSpec extends CassandraSpecUtils {
     testM("selectFirst should return Some(null) for null") {
       for {
         session <- ZIO.service[Session]
-        result <- session.selectFirst(s"select data FROM $keyspace.test_data WHERE id = 0").map(_.map(_.getString(0)))
+        result  <- session.selectFirst(s"select data FROM $keyspace.test_data WHERE id = 0").map(_.map(_.getString(0)))
       } yield assertTrue(result.contains(null))
     },
     testM("selectFirst interpolated query (cqlConst) should return Some") {
@@ -131,9 +132,23 @@ object SessionSpec extends CassandraSpecUtils {
     testM("execute will create a table") {
       for {
         session <- ZIO.service[Session]
-        table    = "table_" +UUID.randomUUID().toString.replaceAll("-", "_")
+        table    = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
         created <- session.execute(cqlConst"create table $keyspace.$table(id text primary key)")
       } yield assertTrue(created)
+    },
+    testM("execute will insert batched data") {
+      for {
+        session  <- ZIO.service[Session]
+        tbl       = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table     = s"$keyspace.$tbl"
+        _        <- session.execute(cqlConst"create table $table(id text primary key)")
+        insert1  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 1')")
+        insert2  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 2')")
+        insert3  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 3')")
+        batch     = Batch.unlogged.add(Seq(insert1, insert2, insert3))
+        inserted <- session.execute(batch)
+        result   <- session.selectFirst(cqlConst"select count(*) from $table".as[Long])
+      } yield assertTrue(inserted, result.contains(3))
     }
   )
 }
