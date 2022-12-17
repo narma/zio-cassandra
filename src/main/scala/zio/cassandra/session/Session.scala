@@ -104,7 +104,7 @@ object Session {
       }
     }
 
-    override def select(stmt: Task[Statement[_]]): Stream[Throwable, Row] =
+    override def select[R](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, Row] =
       select(stmt, continuous = true)
 
     override def select(stmt: Statement[_]): Stream[Throwable, Row] =
