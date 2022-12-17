@@ -19,9 +19,18 @@ trait Session {
 
   def execute(stmt: Statement[_]): Task[AsyncResultSet]
 
+  def execute(stmt: Task[Statement[_]]): Task[AsyncResultSet]
+
   def execute(query: String): Task[AsyncResultSet]
 
   def select(stmt: Statement[_]): Stream[Throwable, Row]
+
+  // Use it for continuous quering
+  // Example: key ((p_id, p_nr), seq_nr) - to fetch all records for composite key `p_id`
+  // we have to first call `select(p_id, p_nr_0)` then `select(p_id, p_nr_1)` & etc
+  // Using the Task[Statement] instead of Statement allow us to
+  // fetch all the records as a single stream
+  def select(stmt: Task[Statement[_]]): Stream[Throwable, Row]
 
   // short-cuts
   def selectFirst(stmt: Statement[_]): Task[Option[Row]]
@@ -68,7 +77,12 @@ object Session {
     override def execute(query: String): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(query))
 
-    override def select(stmt: Statement[_]): Stream[Throwable, Row] = {
+    override def execute(stmt: Task[Statement[_]]): Task[AsyncResultSet] = for {
+      st  <- stmt
+      res <- execute(st)
+    } yield res
+
+    private def select(stmt: Task[Statement[_]], continuous: Boolean): Stream[Throwable, Row] = {
       def pull(ref: Ref[ZIO[Any, Option[Throwable], AsyncResultSet]]): ZIO[Any, Option[Throwable], Chunk[Row]] =
         for {
           io <- ref.get
@@ -76,8 +90,10 @@ object Session {
           _  <- rs match {
                   case _ if rs.hasMorePages                     =>
                     ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).mapError(Option(_)))
-                  case _ if rs.currentPage().iterator().hasNext => ref.set(Pull.end)
-                  case _                                        => Pull.end
+                  case _ if rs.currentPage().iterator().hasNext =>
+                    ref.set(if (continuous) execute(stmt).mapError(Option(_)) else Pull.end)
+                  case _                                        =>
+                    Pull.end
                 }
         } yield Chunk.fromIterable(rs.currentPage().asScala)
 
@@ -87,6 +103,12 @@ object Session {
         } yield pull(ref)
       }
     }
+
+    override def select(stmt: Task[Statement[_]]): Stream[Throwable, Row] =
+      select(stmt, continuous = true)
+
+    override def select(stmt: Statement[_]): Stream[Throwable, Row] =
+      select(ZIO.succeed(stmt), continuous = false)
 
     override def selectFirst(stmt: Statement[_]): Task[Option[Row]] =
       execute(stmt).map(rs => Option(rs.one()))

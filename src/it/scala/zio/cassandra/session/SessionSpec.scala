@@ -13,6 +13,8 @@ import zio.{ Chunk, Scope, ZIO }
 
 import java.net.InetSocketAddress
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
+import com.datastax.oss.driver.api.core.cql.PreparedStatement
 
 object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
 
@@ -156,6 +158,41 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
         inserted <- session.execute(batch)
         result   <- session.selectFirst(cqlConst"select count(*) from $table".as[Long])
       } yield assertTrue(inserted, result.contains(3))
+    },
+    test("select continuously over multiple key partitions") {
+      val partitionSize = 10L
+      val partitionNr   = new AtomicLong(0L)
+
+      // we do not have template interface for now,
+      // hence have to manually set the values
+      def selectStatement(ps: PreparedStatement) = ZIO.attempt {
+        val pn = partitionNr.getAndIncrement()
+        ps.bind()
+          .setLong(0, pn)
+          .setLong(1, pn * partitionSize)
+          .setLong(2, (pn + 1) * partitionSize)
+      }
+
+      for {
+        session <- ZIO.service[Session]
+        tbl      = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table    = s"$keyspace.$tbl"
+        _       <- session.execute(
+                     cqlConst"create table $table(id text, p_nr bigint, seq_nr bigint, primary key((id, p_nr), seq_nr))"
+                   )
+        records  = Chunk.fromIterable(0L.until(37L))
+        _       <- records.mapZIO { i =>
+                     session.execute(cql"""INSERT INTO ${lift(
+                         table
+                       )} (id, p_nr, seq_nr) VALUES('key', ${i / partitionSize}, $i)""")
+                   }
+        // read all records per key partition
+        st      <- session.prepare(
+                     s"""select id, p_nr, seq_nr from ${table} 
+                   |where id = 'key' and p_nr = ? and seq_nr >= ? and seq_nr <= ?""".stripMargin
+                   )
+        res     <- session.select(selectStatement(st)).runCount
+      } yield assertTrue(records.size == res.toInt)
     }
   )
 }
