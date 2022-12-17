@@ -19,18 +19,17 @@ trait Session {
 
   def execute(stmt: Statement[_]): Task[AsyncResultSet]
 
-  def execute(stmt: Task[Statement[_]]): Task[AsyncResultSet]
+  def execute[R](stmt: ZIO[R, Throwable, Statement[_]]): ZIO[R, Throwable, AsyncResultSet]
 
   def execute(query: String): Task[AsyncResultSet]
 
   def select(stmt: Statement[_]): Stream[Throwable, Row]
 
-  // Use it for continuous quering
-  // Example: key ((p_id, p_nr), seq_nr) - to fetch all records for composite key `p_id`
-  // we have to first call `select(p_id, p_nr_0)` then `select(p_id, p_nr_1)` & etc
-  // Using the Task[Statement] instead of Statement allow us to
-  // fetch all the records as a single stream
-  def select(stmt: Task[Statement[_]]): Stream[Throwable, Row]
+  /*
+   * Continuously quering the effect, until empty response returned.
+   * Meaning that effect should provide new statement on each materialization.
+   */
+  def repeatZIO[R](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, Row]
 
   // short-cuts
   def selectFirst(stmt: Statement[_]): Task[Option[Row]]
@@ -77,13 +76,16 @@ object Session {
     override def execute(query: String): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(query))
 
-    override def execute(stmt: Task[Statement[_]]): Task[AsyncResultSet] = for {
+    override def execute[R](stmt: ZIO[R, Throwable, Statement[_]]): ZIO[R, Throwable, AsyncResultSet] = for {
       st  <- stmt
       res <- execute(st)
     } yield res
 
-    private def select(stmt: Task[Statement[_]], continuous: Boolean): Stream[Throwable, Row] = {
-      def pull(ref: Ref[ZIO[Any, Option[Throwable], AsyncResultSet]]): ZIO[Any, Option[Throwable], Chunk[Row]] =
+    private def repeatZIO[R](
+      stmt: ZIO[R, Throwable, Statement[_]],
+      continuous: Boolean
+    ): ZStream[R, Throwable, Row] = {
+      def pull(ref: Ref[ZIO[R, Option[Throwable], AsyncResultSet]]): ZIO[R, Option[Throwable], Chunk[Row]] =
         for {
           io <- ref.get
           rs <- io
@@ -104,11 +106,11 @@ object Session {
       }
     }
 
-    override def select[R](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, Row] =
-      select(stmt, continuous = true)
+    override def repeatZIO[R](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, Row] =
+      repeatZIO(stmt, continuous = true)
 
     override def select(stmt: Statement[_]): Stream[Throwable, Row] =
-      select(ZIO.succeed(stmt), continuous = false)
+      repeatZIO(ZIO.succeed(stmt), continuous = false)
 
     override def selectFirst(stmt: Statement[_]): Task[Option[Row]] =
       execute(stmt).map(rs => Option(rs.one()))

@@ -191,7 +191,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                      s"""select id, p_nr, seq_nr from ${table} 
                    |where id = 'key' and p_nr = ? and seq_nr >= ? and seq_nr <= ?""".stripMargin
                    )
-        res     <- session.select(selectStatement(st)).runCount
+        res     <- session.repeatZIO(selectStatement(st)).runCount
       } yield assertTrue(records.size == res.toInt)
     }
   )
