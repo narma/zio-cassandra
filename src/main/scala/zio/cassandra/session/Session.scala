@@ -19,8 +19,6 @@ trait Session {
 
   def execute(stmt: Statement[_]): Task[AsyncResultSet]
 
-  def execute[R](stmt: ZIO[R, Throwable, Statement[_]]): ZIO[R, Throwable, AsyncResultSet]
-
   def execute(query: String): Task[AsyncResultSet]
 
   def select(stmt: Statement[_]): Stream[Throwable, Row]
@@ -76,15 +74,11 @@ object Session {
     override def execute(query: String): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(query))
 
-    override def execute[R](stmt: ZIO[R, Throwable, Statement[_]]): ZIO[R, Throwable, AsyncResultSet] = for {
-      st  <- stmt
-      res <- execute(st)
-    } yield res
-
     private def repeatZIO[R](
       stmt: ZIO[R, Throwable, Statement[_]],
       continuous: Boolean
     ): ZStream[R, Throwable, Row] = {
+      val executeOpt                                                                                       = stmt.flatMap(execute).mapError(Option(_))
       def pull(ref: Ref[ZIO[R, Option[Throwable], AsyncResultSet]]): ZIO[R, Option[Throwable], Chunk[Row]] =
         for {
           io <- ref.get
@@ -93,7 +87,7 @@ object Session {
                   case _ if rs.hasMorePages                     =>
                     ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).mapError(Option(_)))
                   case _ if rs.currentPage().iterator().hasNext =>
-                    ref.set(if (continuous) execute(stmt).mapError(Option(_)) else Pull.end)
+                    ref.set(if (continuous) executeOpt else Pull.end)
                   case _                                        =>
                     Pull.end
                 }
@@ -101,7 +95,7 @@ object Session {
 
       ZStream.fromPull {
         for {
-          ref <- Ref.make(execute(stmt).mapError(Option(_)))
+          ref <- Ref.make(executeOpt)
         } yield pull(ref)
       }
     }
