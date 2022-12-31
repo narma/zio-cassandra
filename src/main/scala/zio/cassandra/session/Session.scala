@@ -12,6 +12,7 @@ import zio.stream.{ Stream, ZStream }
 
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
+import scala.language.existentials
 
 trait Session {
 
@@ -106,8 +107,11 @@ object Session {
     override def select(stmt: Statement[_]): Stream[Throwable, Row] =
       repeatZIO(ZIO.succeed(stmt), continuous = false)
 
-    override def selectFirst(stmt: Statement[_]): Task[Option[Row]] =
-      execute(stmt).map(rs => Option(rs.one()))
+    override def selectFirst(stmt: Statement[_]): Task[Option[Row]] = {
+      // setPageSize returns T <: Statement[T] for any T, but Scala can't figure it out without clues that will spoil library API
+      val single = stmt.setPageSize(1).asInstanceOf[Statement[_]]
+      execute(single).map(rs => Option(rs.one()))
+    }
 
     override def metrics: Option[Metrics] =
       underlying.getMetrics.toScala
