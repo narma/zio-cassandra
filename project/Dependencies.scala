@@ -12,7 +12,8 @@ object Dependencies {
 
   import V._
 
-  val zioVersion = "2.0.4"
+  val zioVersion      = "2.0.4"
+  val zioCacheVersion = "0.2.1"
 
   val testContainersVersion = "0.40.11"
 
@@ -23,7 +24,8 @@ object Dependencies {
   val zioDependencies = Seq(
     "dev.zio" %% "zio"         % zioVersion,
     "dev.zio" %% "zio-macros"  % zioVersion % "compile-internal",
-    "dev.zio" %% "zio-streams" % zioVersion
+    "dev.zio" %% "zio-streams" % zioVersion,
+    "dev.zio" %% "zio-cache"   % zioCacheVersion
   )
 
   val testCommon = Seq(

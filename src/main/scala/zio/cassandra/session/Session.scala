@@ -6,10 +6,12 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
+import zio.cache.{ Cache, Lookup }
 import zio.cassandra.session.cql.query.{ Batch, PreparedQuery, QueryTemplate }
 import zio.stream.ZStream.Pull
 import zio.stream.{ Stream, ZStream }
 
+import java.time.Duration
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.language.existentials
@@ -32,8 +34,8 @@ trait Session {
   // short-cuts
   def selectFirst(stmt: Statement[_]): Task[Option[Row]]
 
-  /** Same as `repeatZIO`, but allows to use queries at higher level. Has
-    * different name only because otherwise type erasure won't allow method overloading
+  /** Same as `repeatZIO`, but allows to use queries at higher level. Has different name only because otherwise type
+    * erasure won't allow method overloading
     */
   def repeatQueryZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A]
 
@@ -69,9 +71,13 @@ trait Session {
 
 object Session {
 
-  private final case class Live(private val underlying: CqlSession) extends Session {
+  private final case class Live(
+    private val underlying: CqlSession,
+    private val prepareQuery: Cache[String, Throwable, PreparedStatement]
+  ) extends Session {
+
     override def prepare(stmt: String): Task[PreparedStatement] =
-      ZIO.fromCompletionStage(underlying.prepareAsync(stmt))
+      prepareQuery.get(stmt)
 
     override def execute(stmt: Statement[_]): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(stmt))
@@ -144,16 +150,35 @@ object Session {
 
   }
 
+  final case class Config(preparedQueryCache: PreparedQueryCacheConfig)
+
+  object Config {
+    def default: Config = Config(PreparedQueryCacheConfig(64, 10.minutes))
+  }
+
+  final case class PreparedQueryCacheConfig(capacity: Int, timeToLive: Duration)
+
   val live: RIO[Scope with CqlSessionBuilder, Session] =
     ZIO.serviceWithZIO[CqlSessionBuilder](cqlSessionBuilder => make(cqlSessionBuilder))
 
-  def make(builder: => CqlSessionBuilder): RIO[Scope, Session] =
+  val configured: RIO[Scope with CqlSessionBuilder with Config, Session] =
+    for {
+      builder <- ZIO.service[CqlSessionBuilder]
+      config  <- ZIO.service[Config]
+      session <- make(builder, config)
+    } yield session
+
+  def make(builder: => CqlSessionBuilder, config: Config = Config.default): RIO[Scope, Session] =
     ZIO
       .acquireRelease(ZIO.fromCompletionStage(builder.buildAsync())) { session =>
         ZIO.fromCompletionStage(session.closeAsync()).orDie
       }
-      .map(Live(_))
+      .flatMap(existing(_, config))
 
-  def existing(session: CqlSession): Session =
-    Live(session)
+  def existing(session: CqlSession, config: Config = Config.default): UIO[Session] =
+    for {
+      lookup <- ZIO.succeed(Lookup((stmt: String) => ZIO.fromCompletionStage(session.prepareAsync(stmt))))
+      cache  <- Cache.make(config.preparedQueryCache.capacity, config.preparedQueryCache.timeToLive, lookup)
+    } yield Live(session, cache)
+
 }
