@@ -7,7 +7,7 @@ import zio.{ RIO, ZIO }
 class Batch(batchStatementBuilder: BatchStatementBuilder) {
 
   def add(queries: Seq[PreparedQuery[_]]): this.type = {
-    batchStatementBuilder.addStatements(queries.map(_.statement): _*)
+    batchStatementBuilder.addStatements(queries.map(_.bound): _*)
     this
   }
 

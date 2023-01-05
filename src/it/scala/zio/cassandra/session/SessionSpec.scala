@@ -188,7 +188,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                    }
         // read all records per key partition
         st      <- session.prepare(
-                     s"""select id, p_nr, seq_nr from ${table} 
+                     s"""select id, p_nr, seq_nr from ${table}
                    |where id = 'key' and p_nr = ? and seq_nr >= ? and seq_nr <= ?""".stripMargin
                    )
         res     <- session.repeatZIO(selectStatement(st)).runCount
@@ -215,6 +215,29 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                          }
                        }.runCount
       } yield assertTrue(records.size == res.toInt)
+    },
+    test("reuse prepared query") {
+      val partitionSize = 10L
+      for {
+        session     <- ZIO.service[Session]
+        tbl          = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table        = lift(s"$keyspace.$tbl")
+        _           <- session.execute {
+                         cqlConst"create table $table(id text, p_nr bigint, seq_nr bigint, primary key((id, p_nr), seq_nr))"
+                       }
+        records      = Chunk.fromIterable(0L.until(37L))
+        st          <- cql"""insert into $table (id, p_nr, seq_nr) values ('key', ${0L}, ${1L})""".prepare
+        _           <- st.execute
+        _           <- st(1L, 10L).execute
+        _           <- st(1L, 11L).execute
+        _           <- st(2L, 20L).execute
+        partitionNr <- Ref.make(0L)
+        res         <- session.repeatTemplateZIO {
+                         partitionNr.getAndUpdate(_ + 1).map { pn =>
+                           cql"""select * from $table where id = 'key' and p_nr = $pn and seq_nr >= ${pn * partitionSize} and seq_nr <= ${(pn + 1) * partitionSize}"""
+                         }
+                       }.runCount
+      } yield assertTrue(res.toInt == 4)
     }
   )
 }

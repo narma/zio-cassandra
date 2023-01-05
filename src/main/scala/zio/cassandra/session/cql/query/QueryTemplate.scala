@@ -1,10 +1,10 @@
 package zio.cassandra.session.cql.query
 
-import com.datastax.oss.driver.api.core.cql.BoundStatement
 import zio.cassandra.session.Session
 import zio.cassandra.session.cql.codec.Reads
 import zio.stream.ZStream
 import zio.{ RIO, ZIO }
+import com.datastax.oss.driver.api.core.cql.BoundStatement
 
 case class QueryTemplate[R] private[cql] (
   query: String,
@@ -33,5 +33,4 @@ case class QueryTemplate[R] private[cql] (
       this.query + that.query,
       statement => (this.config andThen that.config)(statement)
     )
-
 }
