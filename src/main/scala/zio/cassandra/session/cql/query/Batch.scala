@@ -3,13 +3,21 @@ package zio.cassandra.session.cql.query
 import com.datastax.oss.driver.api.core.cql.{ BatchStatement, BatchStatementBuilder, BatchType }
 import zio.cassandra.session.Session
 import zio.{ RIO, ZIO }
+import com.datastax.oss.driver.api.core.cql.BoundStatement
+import zio.Chunk
 
 class Batch(batchStatementBuilder: BatchStatementBuilder) {
 
-  def add(queries: Seq[PreparedQuery[_]]): this.type = {
-    batchStatementBuilder.addStatements(queries.map(_.bound): _*)
+  def add(queries: Seq[BoundStatement]): this.type = {
+    batchStatementBuilder.addStatements(queries: _*)
     this
   }
+
+  def add(queries: QueryTemplate[_]*): RIO[Session, Batch] =
+    Chunk.fromIterable(queries).mapZIOPar(_.prepare).map { sts =>
+      batchStatementBuilder.addStatements(sts: _*)
+      this
+    }
 
   def build: BatchStatement = batchStatementBuilder.build()
 

@@ -6,13 +6,14 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
-import zio.cassandra.session.cql.query.{ Batch, PreparedQuery, QueryTemplate }
+import zio.cassandra.session.cql.query.{ Batch, QueryTemplate }
 import zio.stream.ZStream.Pull
 import zio.stream.{ Stream, ZStream }
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.language.existentials
 import zio.cassandra.session.cql.codec.Reads
+import zio.cassandra.session.cql.PreparedStatementCache
 
 trait Session {
 
@@ -37,22 +38,26 @@ trait Session {
     */
   def repeatTemplateZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A]
 
-  final def prepare[A](query: QueryTemplate[A]): Task[PreparedQuery[A]] = {
-    import query.reads
-    prepare(query.query).map(PreparedQuery[A](this, _, query.config))
-  }
+  final def prepare[A](query: QueryTemplate[A]): Task[BoundStatement] =
+    prepare(query.query).map(st => query.config(st.bind()))
 
-  final def execute(template: QueryTemplate[_]): Task[Boolean] =
-    prepare(template).flatMap(_.execute)
+  final def execute(template: QueryTemplate[_]): Task[Boolean] = for {
+    st  <- prepare(template)
+    res <- execute(st)
+  } yield res.wasApplied
 
   final def execute(batch: Batch): Task[Boolean] =
     execute(batch.build).map(_.wasApplied)
 
   final def select[A](template: QueryTemplate[A]): Stream[Throwable, A] =
-    ZStream.fromZIO(prepare(template)).flatMap(_.select)
+    ZStream.fromZIO(prepare(template)).flatMap { st =>
+      select(st).mapChunks(_.map(template.reads.read))
+    }
 
-  final def selectFirst[A](template: QueryTemplate[A]): Task[Option[A]] =
-    prepare(template).flatMap(_.selectFirst)
+  final def selectFirst[A](template: QueryTemplate[A]): Task[Option[A]] = for {
+    st  <- prepare(template)
+    res <- selectFirst(st)
+  } yield res.map(template.reads.read)
 
   // other methods
   def metrics: Option[Metrics]
@@ -69,10 +74,12 @@ trait Session {
 
 object Session {
 
-  private final case class Live(private val underlying: CqlSession) extends Session {
+  private val DEFAULT_CAPACITY = 256L
 
-    override def prepare(stmt: String): Task[PreparedStatement] =
-      ZIO.fromCompletionStage(underlying.prepareAsync(stmt))
+  private final case class Live(private val underlying: CqlSession, capacity: Long = DEFAULT_CAPACITY) extends Session {
+    val cache = new PreparedStatementCache(underlying, capacity)
+
+    override def prepare(stmt: String): Task[PreparedStatement] = cache.get(stmt)
 
     override def execute(stmt: Statement[_]): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(stmt))
@@ -161,11 +168,14 @@ object Session {
   val live: RIO[Scope with CqlSessionBuilder, Session] =
     ZIO.serviceWithZIO[CqlSessionBuilder](cqlSessionBuilder => make(cqlSessionBuilder))
 
-  def make(builder: => CqlSessionBuilder): RIO[Scope, Session] = ZIO
+  def live(cacheCapacity: Long): RIO[Scope with CqlSessionBuilder, Session] =
+    ZIO.serviceWithZIO[CqlSessionBuilder](cqlSessionBuilder => make(cqlSessionBuilder, cacheCapacity))
+
+  def make(builder: => CqlSessionBuilder, cacheCapacity: Long = DEFAULT_CAPACITY): RIO[Scope, Session] = ZIO
     .acquireRelease(ZIO.fromCompletionStage(builder.buildAsync())) { session =>
       ZIO.fromCompletionStage(session.closeAsync()).orDie
     }
-    .map(Live(_))
+    .map(Live(_, cacheCapacity))
 
   def existing(session: CqlSession): Session =
     Live(session)

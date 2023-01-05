@@ -13,7 +13,7 @@ case class QueryTemplate[R] private[cql] (
   def +(that: String): QueryTemplate[R] = QueryTemplate[R](this.query + that, config)
   def as[R1: Reads]: QueryTemplate[R1]  = QueryTemplate[R1](query, config)
 
-  def prepare: RIO[Session, PreparedQuery[R]] = ZIO.serviceWithZIO(_.prepare(this))
+  def prepare: RIO[Session, BoundStatement] = ZIO.serviceWithZIO(_.prepare(this))
 
   def select: ZStream[Session, Throwable, R] = ZStream.serviceWithStream(_.select(this))
 

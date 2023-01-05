@@ -31,6 +31,11 @@ object Dependencies {
     "dev.zio" %% "zio-test-sbt" % zioVersion
   ).map(_ % "it,test")
 
+  val cache = Seq(
+    "com.github.ben-manes.caffeine" % "caffeine" % "3.1.2"
+  )
+
+
   val testIntegrationDeps = Seq(
     "org.wvlet.airframe" %% "airframe-log"                   % "22.11.0",
     "org.slf4j"           % "slf4j-jdk14"                    % "2.0.3",
