@@ -96,17 +96,17 @@ object Session {
       }.mapError(Option(_))
 
       def pull(
-        ref: Ref[Function0[ZIO[R, Option[Throwable], (AsyncResultSet, Row => O)]]]
+        ref: Ref[ZIO[R, Option[Throwable], (AsyncResultSet, Row => O)]]
       ): ZIO[R, Option[Throwable], Chunk[O]] =
         for {
           io      <- ref.get
-          tp      <- io()
+          tp      <- io
           (rs, fn) = tp
           _       <- rs match {
                        case _ if rs.hasMorePages                     =>
-                         ref.set(() => ZIO.fromCompletionStage(rs.fetchNextPage()).map(_ -> fn).mapError(Option(_)))
+                         ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).map(_ -> fn).mapError(Option(_)))
                        case _ if rs.currentPage().iterator().hasNext =>
-                         ref.set(if (continuous) () => executeOpt else () => Pull.end)
+                         ref.set(if (continuous) executeOpt else Pull.end)
                        case _                                        =>
                          Pull.end
                      }
@@ -114,7 +114,7 @@ object Session {
 
       ZStream.fromPull {
         for {
-          ref <- Ref.make(() => executeOpt)
+          ref <- Ref.make(executeOpt)
         } yield pull(ref)
       }
     }
