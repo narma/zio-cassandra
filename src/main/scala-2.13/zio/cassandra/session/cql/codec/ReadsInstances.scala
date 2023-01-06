@@ -32,11 +32,11 @@ trait ReadsInstances0 extends ReadsInstances1 {
     reads: Reads[Repr]
   ): Reads[T] = genericReads
 
+  implicit val rowReads: Reads[Row] = instance(identity)
+
 }
 
 trait ReadsInstances1 extends ReadsInstances2 {
-
-  implicit val rowReads: Reads[Row] = instance(identity)
 
   implicit def tuple1Reads[
     T1: CellReads

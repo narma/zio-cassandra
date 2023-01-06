@@ -29,11 +29,11 @@ trait ReadsInstances0 extends ReadsInstances1 {
     */
   inline def derive[T <: Product: Mirror.ProductOf](using configuration: Configuration): Reads[T] = derived[T]
 
+  given Reads[Row] = instance(identity)
+
 }
 
 trait ReadsInstances1 extends ReadsInstances2 {
-
-  given Reads[Row] = instance(identity)
 
   inline given tupleNReads[T <: Tuple]: Reads[T] =
     instance(recurse[T](_)(0).asInstanceOf[T])
