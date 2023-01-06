@@ -12,8 +12,7 @@ object Dependencies {
 
   import V._
 
-  val zioVersion      = "2.0.4"
-  val zioCacheVersion = "0.2.1"
+  val zioVersion = "2.0.5"
 
   val testContainersVersion = "0.40.11"
 
@@ -24,14 +23,18 @@ object Dependencies {
   val zioDependencies = Seq(
     "dev.zio" %% "zio"         % zioVersion,
     "dev.zio" %% "zio-macros"  % zioVersion % "compile-internal",
-    "dev.zio" %% "zio-streams" % zioVersion,
-    "dev.zio" %% "zio-cache"   % zioCacheVersion
+    "dev.zio" %% "zio-streams" % zioVersion
   )
 
   val testCommon = Seq(
     "dev.zio" %% "zio-test"     % zioVersion,
     "dev.zio" %% "zio-test-sbt" % zioVersion
   ).map(_ % "it,test")
+
+  val cache = Seq(
+    "com.github.ben-manes.caffeine" % "caffeine" % "3.1.2"
+  )
+
 
   val testIntegrationDeps = Seq(
     "org.wvlet.airframe" %% "airframe-log"                   % "22.11.0",

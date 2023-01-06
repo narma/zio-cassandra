@@ -151,6 +151,20 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
         tbl       = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
         table     = s"$keyspace.$tbl"
         _        <- session.execute(cqlConst"create table $table(id text primary key)")
+        insert1   = cqlConst"insert into $table(id) values ('primary key 1')"
+        insert2   = cqlConst"insert into $table(id) values ('primary key 2')"
+        insert3   = cqlConst"insert into $table(id) values ('primary key 3')"
+        batch    <- Batch.unlogged.add(insert1, insert2, insert3)
+        inserted <- session.execute(batch)
+        result   <- session.selectFirst(cqlConst"select count(*) from $table".as[Long])
+      } yield assertTrue(inserted, result.contains(3))
+    },
+    test("execute will insert batched data bound") {
+      for {
+        session  <- ZIO.service[Session]
+        tbl       = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table     = s"$keyspace.$tbl"
+        _        <- session.execute(cqlConst"create table $table(id text primary key)")
         insert1  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 1')")
         insert2  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 2')")
         insert3  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 3')")
@@ -188,7 +202,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                    }
         // read all records per key partition
         st      <- session.prepare(
-                     s"""select id, p_nr, seq_nr from ${table} 
+                     s"""select id, p_nr, seq_nr from ${table}
                    |where id = 'key' and p_nr = ? and seq_nr >= ? and seq_nr <= ?""".stripMargin
                    )
         res     <- session.repeatZIO(selectStatement(st)).runCount
@@ -209,7 +223,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                        }
         partitionNr <- Ref.make(0L)
         // read all records per key partition
-        res         <- session.repeatQueryZIO {
+        res         <- session.repeatZIO {
                          partitionNr.getAndUpdate(_ + 1).map { pn =>
                            cql"""select * from $table where id = 'key' and p_nr = $pn and seq_nr >= ${pn * partitionSize} and seq_nr <= ${(pn + 1) * partitionSize}"""
                          }

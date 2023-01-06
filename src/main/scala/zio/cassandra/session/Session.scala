@@ -6,15 +6,14 @@ import com.datastax.oss.driver.api.core.metadata.Metadata
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{ CqlIdentifier, CqlSession, CqlSessionBuilder }
 import zio._
-import zio.cache.{ Cache, Lookup }
-import zio.cassandra.session.cql.query.{ Batch, PreparedQuery, QueryTemplate }
+import zio.cassandra.session.cql.query.{ Batch, QueryTemplate }
 import zio.stream.ZStream.Pull
 import zio.stream.{ Stream, ZStream }
-
-import java.time.Duration
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.language.existentials
+import zio.cassandra.session.cql.codec.Reads
+import zio.cassandra.session.cql.PreparedStatementCache
 
 trait Session {
 
@@ -29,7 +28,7 @@ trait Session {
   /** Continuously querying the effect, until empty response returned. Meaning that effect should provide new statement
     * on each materialization.
     */
-  def repeatZIO[R](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, Row]
+  def repeatZIO[R, O: Reads](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, O]
 
   // short-cuts
   def selectFirst(stmt: Statement[_]): Task[Option[Row]]
@@ -37,24 +36,28 @@ trait Session {
   /** Same as `repeatZIO`, but allows to use queries at higher level. Has different name only because otherwise type
     * erasure won't allow method overloading
     */
-  def repeatQueryZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A]
+  def repeatZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A]
 
-  final def prepare[A](query: QueryTemplate[A]): Task[PreparedQuery[A]] = {
-    import query.reads
-    prepare(query.query).map(PreparedQuery[A](this, _, query.config))
-  }
+  final def prepare[A](query: QueryTemplate[A]): Task[BoundStatement] =
+    prepare(query.query).map(st => query.config(st.bind()))
 
-  final def execute(template: QueryTemplate[_]): Task[Boolean] =
-    prepare(template).flatMap(_.execute)
+  final def execute(template: QueryTemplate[_]): Task[Boolean] = for {
+    st  <- prepare(template)
+    res <- execute(st)
+  } yield res.wasApplied
 
   final def execute(batch: Batch): Task[Boolean] =
     execute(batch.build).map(_.wasApplied)
 
   final def select[A](template: QueryTemplate[A]): Stream[Throwable, A] =
-    ZStream.fromZIO(prepare(template)).flatMap(_.select)
+    ZStream.fromZIO(prepare(template)).flatMap { st =>
+      select(st).mapChunks(_.map(template.reads.read))
+    }
 
-  final def selectFirst[A](template: QueryTemplate[A]): Task[Option[A]] =
-    prepare(template).flatMap(_.selectFirst)
+  final def selectFirst[A](template: QueryTemplate[A]): Task[Option[A]] = for {
+    st  <- prepare(template)
+    res <- selectFirst(st)
+  } yield res.map(template.reads.read)
 
   // other methods
   def metrics: Option[Metrics]
@@ -71,13 +74,12 @@ trait Session {
 
 object Session {
 
-  private final case class Live(
-    private val underlying: CqlSession,
-    private val prepareQuery: Cache[String, Throwable, PreparedStatement]
-  ) extends Session {
+  private val DEFAULT_CAPACITY = 256L
 
-    override def prepare(stmt: String): Task[PreparedStatement] =
-      prepareQuery.get(stmt)
+  private final case class Live(private val underlying: CqlSession, capacity: Long = DEFAULT_CAPACITY) extends Session {
+    val cache = new PreparedStatementCache(underlying, capacity)
+
+    override def prepare(stmt: String): Task[PreparedStatement] = cache.get(stmt)
 
     override def execute(stmt: Statement[_]): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(stmt))
@@ -85,27 +87,45 @@ object Session {
     override def execute(query: String): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(query))
 
-    override def select(stmt: Statement[_]): Stream[Throwable, Row] = {
-      def pull(ref: Ref[ZIO[Any, Option[Throwable], AsyncResultSet]]): ZIO[Any, Option[Throwable], Chunk[Row]] =
+    private def repeatZIO[R, O](
+      stmt: ZIO[R, Throwable, (Statement[_], Row => O)],
+      continuous: Boolean
+    ): ZStream[R, Throwable, O] = {
+      val executeOpt = stmt.flatMap { case (s, o) =>
+        execute(s).map(_ -> o)
+      }.mapError(Option(_))
+
+      def pull(
+        ref: Ref[ZIO[R, Option[Throwable], (AsyncResultSet, Row => O)]]
+      ): ZIO[R, Option[Throwable], Chunk[O]] =
         for {
-          io <- ref.get
-          rs <- io
-          _  <- rs match {
-                  case _ if rs.hasMorePages                     => ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).mapError(Option(_)))
-                  case _ if rs.currentPage().iterator().hasNext => ref.set(Pull.end)
-                  case _                                        => Pull.end
-                }
-        } yield Chunk.fromIterable(rs.currentPage().asScala)
+          io      <- ref.get
+          tp      <- io
+          (rs, fn) = tp
+          _       <- rs match {
+                       case _ if rs.hasMorePages                     =>
+                         ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).map(_ -> fn).mapError(Option(_)))
+                       case _ if rs.currentPage().iterator().hasNext =>
+                         ref.set(if (continuous) executeOpt else Pull.end)
+                       case _                                        =>
+                         Pull.end
+                     }
+        } yield Chunk.fromIterable(rs.currentPage().asScala).map(fn)
 
       ZStream.fromPull {
         for {
-          ref <- Ref.make(execute(stmt).mapError(Option(_)))
+          ref <- Ref.make(executeOpt)
         } yield pull(ref)
       }
     }
 
-    override def repeatZIO[R](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, Row] =
-      repeatUntilEmpty(stmt.map(select(_)))
+    override def select(stmt: Statement[_]): Stream[Throwable, Row] =
+      repeatZIO(ZIO.succeed(stmt -> identity), false)
+
+    override def repeatZIO[R, O](stmt: ZIO[R, Throwable, Statement[_]])(implicit
+      rds: Reads[O]
+    ): ZStream[R, Throwable, O] =
+      repeatZIO(stmt.map(_ -> rds.read _), true)
 
     override def selectFirst(stmt: Statement[_]): Task[Option[Row]] = {
       // setPageSize returns T <: Statement[T] for any T, but Scala can't figure it out without clues that will spoil library API
@@ -113,8 +133,14 @@ object Session {
       execute(single).map(rs => Option(rs.one()))
     }
 
-    override def repeatQueryZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A] =
-      repeatUntilEmpty(template.map(select(_)))
+    override def repeatZIO[R, A](
+      template: ZIO[R, Throwable, QueryTemplate[A]]
+    ): ZStream[R, Throwable, A] = {
+      val io = template.flatMap { tm =>
+        prepare(tm.query).map(ps => tm.config(ps.bind()) -> (tm.reads.read _))
+      }
+      repeatZIO(io, true)
+    }
 
     override def metrics: Option[Metrics] =
       underlying.getMetrics.toScala
@@ -137,48 +163,21 @@ object Session {
     override def context: DriverContext = underlying.getContext
 
     override def keyspace: Option[CqlIdentifier] = underlying.getKeyspace.toScala
-
-    private def repeatUntilEmpty[R, E, A](stream: ZIO[R, E, ZStream[R, E, A]]): ZStream[R, E, A] = {
-      lazy val go: ZStream[R, Either[E, Unit], A] =
-        ZStream.unwrap(stream).mapError(Left(_)).orElseIfEmpty(ZStream.fail(Right(()))).concat(go)
-
-      go.catchAll {
-        case Left(value) => ZStream.fail(value)
-        case Right(_)    => ZStream.empty
-      }
-    }
-
   }
-
-  final case class Config(preparedQueryCache: PreparedQueryCacheConfig)
-
-  object Config {
-    def default: Config = Config(PreparedQueryCacheConfig(64, 10.minutes))
-  }
-
-  final case class PreparedQueryCacheConfig(capacity: Int, timeToLive: Duration)
 
   val live: RIO[Scope with CqlSessionBuilder, Session] =
     ZIO.serviceWithZIO[CqlSessionBuilder](cqlSessionBuilder => make(cqlSessionBuilder))
 
-  val configured: RIO[Scope with CqlSessionBuilder with Config, Session] =
-    for {
-      builder <- ZIO.service[CqlSessionBuilder]
-      config  <- ZIO.service[Config]
-      session <- make(builder, config)
-    } yield session
+  def live(cacheCapacity: Long): RIO[Scope with CqlSessionBuilder, Session] =
+    ZIO.serviceWithZIO[CqlSessionBuilder](cqlSessionBuilder => make(cqlSessionBuilder, cacheCapacity))
 
-  def make(builder: => CqlSessionBuilder, config: Config = Config.default): RIO[Scope, Session] =
-    ZIO
-      .acquireRelease(ZIO.fromCompletionStage(builder.buildAsync())) { session =>
-        ZIO.fromCompletionStage(session.closeAsync()).orDie
-      }
-      .flatMap(existing(_, config))
+  def make(builder: => CqlSessionBuilder, cacheCapacity: Long = DEFAULT_CAPACITY): RIO[Scope, Session] = ZIO
+    .acquireRelease(ZIO.fromCompletionStage(builder.buildAsync())) { session =>
+      ZIO.fromCompletionStage(session.closeAsync()).orDie
+    }
+    .map(Live(_, cacheCapacity))
 
-  def existing(session: CqlSession, config: Config = Config.default): UIO[Session] =
-    for {
-      lookup <- ZIO.succeed(Lookup((stmt: String) => ZIO.fromCompletionStage(session.prepareAsync(stmt))))
-      cache  <- Cache.make(config.preparedQueryCache.capacity, config.preparedQueryCache.timeToLive, lookup)
-    } yield Live(session, cache)
+  def existing(session: CqlSession): Session =
+    Live(session)
 
 }
