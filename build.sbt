@@ -35,6 +35,7 @@ lazy val root =
       libraryDependencies ++=
         Dependencies.cassandraDependencies ++
           Dependencies.zioDependencies ++
+          Dependencies.cache ++
           shapelessDeps(scalaVersion.value) ++
           Dependencies.testCommon ++
           Dependencies.testIntegrationDeps,
