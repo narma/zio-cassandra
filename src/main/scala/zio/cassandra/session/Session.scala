@@ -121,7 +121,7 @@ object Session {
     ): ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any] =
       loop(io.flatMap(execute), fn, continuous, loop(io, fn, continuous))
 
-    private def loop[R, A, B](
+    private def loop[R, A](
       ch: ZIO[R, Throwable, AsyncResultSet],
       fn: Row => A,
       continuous: Boolean,
@@ -145,9 +145,9 @@ object Session {
     override def select(stmt: Statement[_]): Stream[Throwable, Row] =
       ZStream.fromChannel(loop(ZIO.succeed(stmt), identity, continuous = false))
 
-    override def repeatZIO[R, O](stmt: ZIO[R, Throwable, Statement[_]])(implicit
-      rds: Reads[O]
-    ): ZStream[R, Throwable, O] =
+    override def repeatZIO[R, A](stmt: ZIO[R, Throwable, Statement[_]])(implicit
+      rds: Reads[A]
+    ): ZStream[R, Throwable, A] =
       ZStream.fromChannel(loop(stmt, rds.read, continuous = true))
 
     override def selectFirst(stmt: Statement[_]): Task[Option[Row]] = {
