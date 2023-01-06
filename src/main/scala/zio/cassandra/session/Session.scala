@@ -36,7 +36,7 @@ trait Session {
   /** Same as `repeatZIO`, but allows to use queries at higher level. Has different name only because otherwise type
     * erasure won't allow method overloading
     */
-  def repeatTemplateZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A]
+  def repeatZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A]
 
   final def prepare[A](query: QueryTemplate[A]): Task[BoundStatement] =
     prepare(query.query).map(st => query.config(st.bind()))
@@ -133,7 +133,7 @@ object Session {
       execute(single).map(rs => Option(rs.one()))
     }
 
-    override def repeatTemplateZIO[R, A](
+    override def repeatZIO[R, A](
       template: ZIO[R, Throwable, QueryTemplate[A]]
     ): ZStream[R, Throwable, A] = {
       val io = template.flatMap { tm =>

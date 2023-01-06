@@ -223,7 +223,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                        }
         partitionNr <- Ref.make(0L)
         // read all records per key partition
-        res         <- session.repeatTemplateZIO {
+        res         <- session.repeatZIO {
                          partitionNr.getAndUpdate(_ + 1).map { pn =>
                            cql"""select * from $table where id = 'key' and p_nr = $pn and seq_nr >= ${pn * partitionSize} and seq_nr <= ${(pn + 1) * partitionSize}"""
                          }
