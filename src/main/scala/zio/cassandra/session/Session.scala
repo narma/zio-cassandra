@@ -9,13 +9,10 @@ import zio._
 import zio.cassandra.session.cql.cache.AsyncCache
 import zio.cassandra.session.cql.codec.Reads
 import zio.cassandra.session.cql.query.{ Batch, QueryTemplate }
-import zio.stream.ZStream.Pull
-import zio.stream.{ Stream, ZStream }
+import zio.stream.{ Stream, ZChannel, ZStream }
 
-import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.language.existentials
-import zio.stream.ZChannel
 
 trait Session {
 
