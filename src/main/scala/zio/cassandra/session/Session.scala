@@ -15,6 +15,7 @@ import zio.stream.{ Stream, ZStream }
 import scala.jdk.CollectionConverters.IterableHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 import scala.language.existentials
+import zio.stream.ZChannel
 
 trait Session {
 
@@ -89,40 +90,65 @@ object Session {
     override def execute(query: String): Task[AsyncResultSet] =
       ZIO.fromCompletionStage(underlying.executeAsync(query))
 
-    private def repeatZIO[R, A](
-      stmt: ZIO[R, Throwable, (Statement[_], Row => A)],
-      continuous: Boolean
-    ): ZStream[R, Throwable, A] = {
-      val executeOpt = stmt.flatMap { case (s, rowToA) => execute(s).map(_ -> rowToA) }.mapError(Option(_))
-
-      def pull(ref: Ref[ZIO[R, Option[Throwable], (AsyncResultSet, Row => A)]]): ZIO[R, Option[Throwable], Chunk[A]] =
-        for {
-          io      <- ref.get
-          tp      <- io
-          (rs, fn) = tp
-          _       <- rs match {
-                       case _ if rs.hasMorePages                     =>
-                         ref.set(ZIO.fromCompletionStage(rs.fetchNextPage()).mapBoth(Option(_), _ -> fn))
-                       case _ if rs.currentPage().iterator().hasNext =>
-                         ref.set(if (continuous) executeOpt else Pull.end)
-                       case _                                        =>
-                         Pull.end
-                     }
-          chunk   <- ZIO.attempt(Chunk.fromIterable(rs.currentPage().asScala.map(fn))).mapError(Some(_))
-        } yield chunk
-
-      ZStream.fromPull {
-        for {
-          ref <- Ref.make(executeOpt)
-        } yield pull(ref)
+    private def write[R, A](
+      in: java.lang.Iterable[Row],
+      fn: Row => A
+    ): ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any] = {
+      def toChunk(it: java.util.Iterator[Row]) = {
+        val builder = ChunkBuilder.make[A]()
+        while (it.hasNext()) {
+          val a = it.next()
+          builder += fn(a)
+        }
+        builder.result()
       }
+
+      ZChannel.fromZIO(ZIO.attempt(toChunk(in.iterator()))).flatMap(ZChannel.write)
     }
 
-    override def select(stmt: Statement[_]): Stream[Throwable, Row] =
-      repeatZIO(ZIO.succeed((stmt, identity)), continuous = false)
+    private def loop[R, A](
+      io: ZIO[R, Throwable, QueryTemplate[A]],
+      continuous: Boolean
+    ): ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any] =
+      ZChannel.fromZIO(io).flatMap { qt =>
+        loop(prepare(qt).flatMap(execute), qt.reads.read, continuous, loop(io, continuous))
+      }
 
-    override def repeatZIO[R, A: Reads](stmt: ZIO[R, Throwable, Statement[_]]): ZStream[R, Throwable, A] =
-      repeatZIO(stmt.map((_, Reads[A].read(_))), continuous = true)
+    private def loop[R, A](
+      io: ZIO[R, Throwable, Statement[_]],
+      fn: Row => A,
+      continuous: Boolean
+    ): ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any] =
+      loop(io.flatMap(execute), fn, continuous, loop(io, fn, continuous))
+
+    private def loop[R, A](
+      ch: ZIO[R, Throwable, AsyncResultSet],
+      fn: Row => A,
+      continuous: Boolean,
+      next: => ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any]
+    ): ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any] =
+      ZChannel.fromZIO(ch).flatMap {
+        case rs if rs.hasMorePages                     =>
+          write(rs.currentPage(), fn) *> loop(
+            ZIO.fromCompletionStage(rs.fetchNextPage()),
+            fn,
+            continuous,
+            next
+          )
+        case rs if rs.currentPage().iterator().hasNext =>
+          if (continuous) {
+            write(rs.currentPage(), fn) *> next
+          } else write(rs.currentPage(), fn)
+        case _                                         => ZChannel.unit
+      }
+
+    override def select(stmt: Statement[_]): Stream[Throwable, Row] =
+      ZStream.fromChannel(loop(ZIO.succeed(stmt), identity, continuous = false))
+
+    override def repeatZIO[R, A](stmt: ZIO[R, Throwable, Statement[_]])(implicit
+      rds: Reads[A]
+    ): ZStream[R, Throwable, A] =
+      ZStream.fromChannel(loop(stmt, rds.read, continuous = true))
 
     override def selectFirst(stmt: Statement[_]): Task[Option[Row]] = {
       // setPageSize returns T <: Statement[T] for any T, but Scala can't figure it out without clues that will spoil library API
@@ -130,12 +156,8 @@ object Session {
       execute(single).map(rs => Option(rs.one()))
     }
 
-    override def repeatZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A] = {
-      val io = template.flatMap { tm =>
-        prepare(tm.query).map(ps => tm.config(ps.bind()) -> tm.reads.read _)
-      }
-      repeatZIO(io, continuous = true)
-    }
+    override def repeatZIO[R, A](template: ZIO[R, Throwable, QueryTemplate[A]]): ZStream[R, Throwable, A] =
+      ZStream.fromChannel(loop(template, continuous = true))
 
     override def metrics: Option[Metrics] =
       underlying.getMetrics.toScala
