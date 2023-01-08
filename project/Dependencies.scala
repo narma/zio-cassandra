@@ -12,9 +12,9 @@ object Dependencies {
 
   import V._
 
-  val zioVersion = "2.0.4"
+  val zioVersion = "2.0.5"
 
-  val testContainersVersion = "0.40.11"
+  val testContainersVersion = "0.40.12"
 
   val cassandraDependencies = Seq(
     "com.datastax.oss" % "java-driver-core" % cassandraDriverVersion % "provided"
@@ -22,7 +22,6 @@ object Dependencies {
 
   val zioDependencies = Seq(
     "dev.zio" %% "zio"         % zioVersion,
-    "dev.zio" %% "zio-macros"  % zioVersion % "compile-internal",
     "dev.zio" %% "zio-streams" % zioVersion
   )
 
@@ -31,12 +30,17 @@ object Dependencies {
     "dev.zio" %% "zio-test-sbt" % zioVersion
   ).map(_ % "it,test")
 
+  val cache = Seq(
+    "com.github.ben-manes.caffeine" % "caffeine" % "3.1.2"
+  )
+
+
   val testIntegrationDeps = Seq(
-    "org.wvlet.airframe" %% "airframe-log"                   % "22.11.0",
-    "org.slf4j"           % "slf4j-jdk14"                    % "2.0.3",
+    "org.wvlet.airframe" %% "airframe-log"                   % "22.12.6",
+    "org.slf4j"           % "slf4j-jdk14"                    % "2.0.5",
     "com.dimafeng"       %% "testcontainers-scala-core"      % testContainersVersion,
     "com.dimafeng"       %% "testcontainers-scala-cassandra" % testContainersVersion,
-    "org.testcontainers"  % "testcontainers"                 % "1.17.4"
+    "org.testcontainers"  % "testcontainers"                 % "1.17.6"
   ).map(_ % "it")
 
 }

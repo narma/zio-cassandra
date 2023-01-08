@@ -9,7 +9,7 @@ import zio.cassandra.session.cql.query.Batch
 import zio.cassandra.session.cql.unsafe.lift
 import zio.test.Assertion._
 import zio.test._
-import zio.{ Chunk, Scope, ZIO }
+import zio.{ Chunk, Ref, Scope, ZIO }
 
 import java.net.InetSocketAddress
 import java.util.UUID
@@ -151,6 +151,20 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
         tbl       = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
         table     = s"$keyspace.$tbl"
         _        <- session.execute(cqlConst"create table $table(id text primary key)")
+        insert1   = cqlConst"insert into $table(id) values ('primary key 1')"
+        insert2   = cqlConst"insert into $table(id) values ('primary key 2')"
+        insert3   = cqlConst"insert into $table(id) values ('primary key 3')"
+        batch    <- Batch.unlogged.add(insert1, insert2, insert3)
+        inserted <- session.execute(batch)
+        result   <- session.selectFirst(cqlConst"select count(*) from $table".as[Long])
+      } yield assertTrue(inserted, result.contains(3))
+    },
+    test("execute will insert batched data bound") {
+      for {
+        session  <- ZIO.service[Session]
+        tbl       = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table     = s"$keyspace.$tbl"
+        _        <- session.execute(cqlConst"create table $table(id text primary key)")
         insert1  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 1')")
         insert2  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 2')")
         insert3  <- session.prepare(cqlConst"insert into $table(id) values ('primary key 3')")
@@ -159,7 +173,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
         result   <- session.selectFirst(cqlConst"select count(*) from $table".as[Long])
       } yield assertTrue(inserted, result.contains(3))
     },
-    test("select continuously over multiple key partitions") {
+    test("select continuously over multiple key partitions (raw query)") {
       val partitionSize = 10L
       val partitionNr   = new AtomicLong(0L)
 
@@ -188,10 +202,32 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                    }
         // read all records per key partition
         st      <- session.prepare(
-                     s"""select id, p_nr, seq_nr from ${table} 
+                     s"""select id, p_nr, seq_nr from ${table}
                    |where id = 'key' and p_nr = ? and seq_nr >= ? and seq_nr <= ?""".stripMargin
                    )
         res     <- session.repeatZIO(selectStatement(st)).runCount
+      } yield assertTrue(records.size == res.toInt)
+    },
+    test("select continuously over multiple key partitions (dsl query)") {
+      val partitionSize = 10L
+      for {
+        session     <- ZIO.service[Session]
+        tbl          = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table        = lift(s"$keyspace.$tbl")
+        _           <- session.execute {
+                         cqlConst"create table $table(id text, p_nr bigint, seq_nr bigint, primary key((id, p_nr), seq_nr))"
+                       }
+        records      = Chunk.fromIterable(0L.until(37L))
+        _           <- records.mapZIO { i =>
+                         session.execute(cql"""insert into $table (id, p_nr, seq_nr) values ('key', ${i / partitionSize}, $i)""")
+                       }
+        partitionNr <- Ref.make(0L)
+        // read all records per key partition
+        res         <- session.repeatZIO {
+                         partitionNr.getAndUpdate(_ + 1).map { pn =>
+                           cql"""select * from $table where id = 'key' and p_nr = $pn and seq_nr >= ${pn * partitionSize} and seq_nr <= ${(pn + 1) * partitionSize}"""
+                         }
+                       }.runCount
       } yield assertTrue(records.size == res.toInt)
     }
   )
