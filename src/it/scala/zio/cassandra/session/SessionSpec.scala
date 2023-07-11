@@ -206,7 +206,7 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                    |where id = 'key' and p_nr = ? and seq_nr >= ? and seq_nr <= ?""".stripMargin
                    )
         res     <- session.repeatZIO(selectStatement(st)).runCount
-      } yield assertTrue(records.size == res.toInt)
+      } yield assertTrue(res.toInt == records.size)
     },
     test("select continuously over multiple key partitions (dsl query)") {
       val partitionSize = 10L
@@ -228,7 +228,31 @@ object SessionSpec extends ZIOCassandraSpec with ZIOCassandraSpecUtils {
                            cql"""select * from $table where id = 'key' and p_nr = $pn and seq_nr >= ${pn * partitionSize} and seq_nr <= ${(pn + 1) * partitionSize}"""
                          }
                        }.runCount
-      } yield assertTrue(records.size == res.toInt)
+      } yield assertTrue(res.toInt == records.size)
+    },
+    test("select continuously over multiple key partitions (dsl query) and deal nicely with page end corner case") {
+      val partitionSize = 10L
+      for {
+        session     <- ZIO.service[Session]
+        tbl          = "table_" + UUID.randomUUID().toString.replaceAll("-", "_")
+        table        = lift(s"$keyspace.$tbl")
+        _           <- session.execute {
+                         cqlConst"create table $table(id text, p_nr bigint, seq_nr bigint, primary key((id, p_nr), seq_nr))"
+                       }
+        records      = Chunk.fromIterable(0L.until(37L))
+        _           <- records.mapZIO { i =>
+                         session.execute(cql"""insert into $table (id, p_nr, seq_nr) values ('key', ${i / partitionSize}, $i)""")
+                       }
+        partitionNr <- Ref.make(0L)
+        // read all records per key partition
+        res         <- session.repeatZIO {
+                         partitionNr.getAndUpdate(_ + 1).map { pn =>
+                           cql"""select seq_nr from $table where id = 'key' and p_nr = $pn and seq_nr >= ${pn * partitionSize} and seq_nr <= ${(pn + 1) * partitionSize}"""
+                             .config(_.setPageSize(1))
+                             .as[Long]
+                         }
+                       }.runCollect
+      } yield assertTrue(res.toSet == records.toSet)
     }
   )
 }

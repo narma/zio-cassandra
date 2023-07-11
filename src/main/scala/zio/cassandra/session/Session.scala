@@ -122,21 +122,25 @@ object Session {
       ch: ZIO[R, Throwable, AsyncResultSet],
       fn: Row => A,
       continuous: Boolean,
-      next: => ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any]
+      next: => ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any],
+      partitionNonEmpty: Boolean = false
     ): ZChannel[R, Any, Any, Any, Throwable, Chunk[A], Any] =
       ZChannel.fromZIO(ch).flatMap {
-        case rs if rs.hasMorePages                     =>
+        case rs if rs.hasMorePages =>
           write(rs.currentPage(), fn) *> loop(
             ZIO.fromCompletionStage(rs.fetchNextPage()),
             fn,
             continuous,
-            next
+            next,
+            partitionNonEmpty = true
           )
-        case rs if rs.currentPage().iterator().hasNext =>
-          if (continuous) {
-            write(rs.currentPage(), fn) *> next
-          } else write(rs.currentPage(), fn)
-        case _                                         => ZChannel.unit
+        case rs                    =>
+          val hasMoreElements = rs.currentPage().iterator().hasNext
+
+          val curr  = if (hasMoreElements) write(rs.currentPage(), fn) else ZChannel.unit
+          val next_ = if (continuous && (hasMoreElements || partitionNonEmpty)) next else ZChannel.unit
+
+          curr *> next_
       }
 
     override def select(stmt: Statement[_]): Stream[Throwable, Row] =
